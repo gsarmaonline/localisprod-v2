@@ -22,6 +22,10 @@ func NewDeploymentHandler(s *store.Store) *DeploymentHandler {
 }
 
 func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
 	var body struct {
 		ApplicationID string `json:"application_id"`
 		NodeID        string `json:"node_id"`
@@ -35,13 +39,13 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app, err := h.store.GetApplication(body.ApplicationID)
+	app, err := h.store.GetApplication(body.ApplicationID, userID)
 	if err != nil || app == nil {
 		writeError(w, http.StatusNotFound, "application not found")
 		return
 	}
 
-	node, err := h.store.GetNode(body.NodeID)
+	node, err := h.store.GetNode(body.NodeID, userID)
 	if err != nil || node == nil {
 		writeError(w, http.StatusNotFound, "node not found")
 		return
@@ -59,7 +63,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:        "pending",
 		CreatedAt:     time.Now().UTC(),
 	}
-	if err := h.store.CreateDeployment(deployment); err != nil {
+	if err := h.store.CreateDeployment(deployment, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -74,13 +78,13 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// If image is from ghcr.io, authenticate first
 	if strings.HasPrefix(app.DockerImage, "ghcr.io/") {
-		ghToken, _ := h.store.GetSetting("github_token")
-		ghUsername, _ := h.store.GetSetting("github_username")
+		ghToken, _ := h.store.GetUserSetting(userID, "github_token")
+		ghUsername, _ := h.store.GetUserSetting(userID, "github_username")
 		if ghToken != "" && ghUsername != "" {
 			loginCmd := sshexec.DockerLoginCmd(ghUsername, ghToken)
 			loginOutput, loginErr := runner.Run(loginCmd)
 			if loginErr != nil {
-				_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")
+				_ = h.store.UpdateDeploymentStatus(deployment.ID, userID, "failed", "")
 				deployment.Status = "failed"
 				writeJSON(w, http.StatusOK, map[string]interface{}{
 					"deployment": deployment,
@@ -105,7 +109,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 			buf.WriteByte('\n')
 		}
 		if err := runner.WriteFile(envFilePath, buf.String()); err != nil {
-			_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")
+			_ = h.store.UpdateDeploymentStatus(deployment.ID, userID, "failed", "")
 			deployment.Status = "failed"
 			writeJSON(w, http.StatusOK, map[string]interface{}{
 				"deployment": deployment,
@@ -144,7 +148,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if runErr != nil {
-		_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")
+		_ = h.store.UpdateDeploymentStatus(deployment.ID, userID, "failed", "")
 		deployment.Status = "failed"
 		writeJSON(w, http.StatusOK, map[string]interface{}{
 			"deployment": deployment,
@@ -155,7 +159,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	containerID := strings.TrimSpace(output)
-	_ = h.store.UpdateDeploymentStatus(deployment.ID, "running", containerID)
+	_ = h.store.UpdateDeploymentStatus(deployment.ID, userID, "running", containerID)
 	deployment.Status = "running"
 	deployment.ContainerID = containerID
 
@@ -163,7 +167,11 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
-	deployments, err := h.store.ListDeployments()
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	deployments, err := h.store.ListDeployments(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -175,7 +183,11 @@ func (h *DeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *DeploymentHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
-	d, err := h.store.GetDeployment(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	d, err := h.store.GetDeployment(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -188,7 +200,11 @@ func (h *DeploymentHandler) Get(w http.ResponseWriter, r *http.Request, id strin
 }
 
 func (h *DeploymentHandler) Delete(w http.ResponseWriter, r *http.Request, id string) {
-	d, err := h.store.GetDeployment(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	d, err := h.store.GetDeployment(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -198,13 +214,13 @@ func (h *DeploymentHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 
-	node, err := h.store.GetNode(d.NodeID)
+	node, err := h.store.GetNode(d.NodeID, userID)
 	if err == nil && node != nil {
 		cmd := sshexec.DockerStopRemoveCmd(d.ContainerName)
 		_, _ = sshexec.NewRunner(node).Run(cmd)
 	}
 
-	if err := h.store.DeleteDeployment(id); err != nil {
+	if err := h.store.DeleteDeployment(id, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -212,13 +228,17 @@ func (h *DeploymentHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 }
 
 func (h *DeploymentHandler) Restart(w http.ResponseWriter, r *http.Request, id string) {
-	d, err := h.store.GetDeployment(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	d, err := h.store.GetDeployment(id, userID)
 	if err != nil || d == nil {
 		writeError(w, http.StatusNotFound, "deployment not found")
 		return
 	}
 
-	node, err := h.store.GetNode(d.NodeID)
+	node, err := h.store.GetNode(d.NodeID, userID)
 	if err != nil || node == nil {
 		writeError(w, http.StatusNotFound, "node not found")
 		return
@@ -236,7 +256,7 @@ func (h *DeploymentHandler) Restart(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 
-	_ = h.store.UpdateDeploymentStatus(id, "running", d.ContainerID)
+	_ = h.store.UpdateDeploymentStatus(id, userID, "running", d.ContainerID)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "running",
 		"message": "container restarted",
@@ -244,13 +264,17 @@ func (h *DeploymentHandler) Restart(w http.ResponseWriter, r *http.Request, id s
 }
 
 func (h *DeploymentHandler) Logs(w http.ResponseWriter, r *http.Request, id string) {
-	d, err := h.store.GetDeployment(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	d, err := h.store.GetDeployment(id, userID)
 	if err != nil || d == nil {
 		writeError(w, http.StatusNotFound, "deployment not found")
 		return
 	}
 
-	node, err := h.store.GetNode(d.NodeID)
+	node, err := h.store.GetNode(d.NodeID, userID)
 	if err != nil || node == nil {
 		writeError(w, http.StatusNotFound, "node not found")
 		return

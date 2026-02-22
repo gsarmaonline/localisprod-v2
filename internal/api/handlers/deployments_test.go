@@ -38,7 +38,7 @@ func TestDeploymentCreate_InvalidJSON(t *testing.T) {
 	h := handlers.NewDeploymentHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/deployments", nil)
+	r := withUserID(httptest.NewRequest(http.MethodPost, "/api/deployments", nil))
 	r.Header.Set("Content-Type", "application/json")
 	h.Create(rec, r)
 
@@ -186,7 +186,7 @@ func TestDeploymentDelete_NotFound(t *testing.T) {
 	h := handlers.NewDeploymentHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodDelete, "/api/deployments/bad", nil)
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/deployments/bad", nil))
 	h.Delete(rec, r, "bad")
 
 	if rec.Code != http.StatusNotFound {
@@ -202,7 +202,7 @@ func TestDeploymentDelete_Success(t *testing.T) {
 	d := mustCreateDeployment(t, s, a.ID, n.ID)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodDelete, "/api/deployments/"+d.ID, nil)
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/deployments/"+d.ID, nil))
 	h.Delete(rec, r, d.ID)
 
 	if rec.Code != http.StatusNoContent {
@@ -239,7 +239,7 @@ func TestDeploymentRestart_NodeMissing(t *testing.T) {
 	d := mustCreateDeployment(t, s, a.ID, n.ID)
 
 	// Delete the node.
-	_ = s.DeleteNode(n.ID)
+	_ = s.DeleteNode(n.ID, testUserID)
 
 	rec := httptest.NewRecorder()
 	r := postJSON(t, "/api/deployments/"+d.ID+"/restart", nil)
@@ -268,7 +268,7 @@ func TestDeploymentLogs_NodeMissing(t *testing.T) {
 	n := mustCreateNode(t, s)
 	a := mustCreateApp(t, s)
 	d := mustCreateDeployment(t, s, a.ID, n.ID)
-	_ = s.DeleteNode(n.ID)
+	_ = s.DeleteNode(n.ID, testUserID)
 
 	rec := httptest.NewRecorder()
 	h.Logs(rec, getRequest("/api/deployments/"+d.ID+"/logs"), d.ID)

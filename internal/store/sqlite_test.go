@@ -9,6 +9,8 @@ import (
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
 
+const testUserID = "test-user-id"
+
 // newTestStore creates an in-memory SQLite store for testing.
 func newTestStore(t *testing.T) *store.Store {
 	t.Helper()
@@ -88,7 +90,8 @@ func TestEnsureLocalNode_CreatesNode(t *testing.T) {
 		t.Fatalf("EnsureLocalNode: %v", err)
 	}
 
-	nodes, err := s.ListNodes()
+	// EnsureLocalNode creates with userID="", query with empty string
+	nodes, err := s.ListNodes("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +110,7 @@ func TestEnsureLocalNode_Idempotent(t *testing.T) {
 		t.Fatalf("second EnsureLocalNode: %v", err)
 	}
 
-	nodes, err := s.ListNodes()
+	nodes, err := s.ListNodes("")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,11 +125,11 @@ func TestCreateNode_GetNode(t *testing.T) {
 	s := newTestStore(t)
 	n := sampleNode("node1")
 
-	if err := s.CreateNode(n); err != nil {
+	if err := s.CreateNode(n, testUserID); err != nil {
 		t.Fatalf("CreateNode: %v", err)
 	}
 
-	got, err := s.GetNode(n.ID)
+	got, err := s.GetNode(n.ID, testUserID)
 	if err != nil {
 		t.Fatalf("GetNode: %v", err)
 	}
@@ -152,7 +155,7 @@ func TestCreateNode_GetNode(t *testing.T) {
 
 func TestGetNode_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	got, err := s.GetNode("nonexistent-id")
+	got, err := s.GetNode("nonexistent-id", testUserID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -163,7 +166,7 @@ func TestGetNode_NotFound(t *testing.T) {
 
 func TestListNodes_Empty(t *testing.T) {
 	s := newTestStore(t)
-	nodes, err := s.ListNodes()
+	nodes, err := s.ListNodes(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,10 +177,10 @@ func TestListNodes_Empty(t *testing.T) {
 
 func TestListNodes_Multiple(t *testing.T) {
 	s := newTestStore(t)
-	_ = s.CreateNode(sampleNode("alpha"))
-	_ = s.CreateNode(sampleNode("beta"))
+	_ = s.CreateNode(sampleNode("alpha"), testUserID)
+	_ = s.CreateNode(sampleNode("beta"), testUserID)
 
-	nodes, err := s.ListNodes()
+	nodes, err := s.ListNodes(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,13 +192,13 @@ func TestListNodes_Multiple(t *testing.T) {
 func TestDeleteNode(t *testing.T) {
 	s := newTestStore(t)
 	n := sampleNode("node-del")
-	_ = s.CreateNode(n)
+	_ = s.CreateNode(n, testUserID)
 
-	if err := s.DeleteNode(n.ID); err != nil {
+	if err := s.DeleteNode(n.ID, testUserID); err != nil {
 		t.Fatalf("DeleteNode: %v", err)
 	}
 
-	got, _ := s.GetNode(n.ID)
+	got, _ := s.GetNode(n.ID, testUserID)
 	if got != nil {
 		t.Fatal("expected nil after deletion")
 	}
@@ -204,13 +207,13 @@ func TestDeleteNode(t *testing.T) {
 func TestUpdateNodeStatus(t *testing.T) {
 	s := newTestStore(t)
 	n := sampleNode("status-test")
-	_ = s.CreateNode(n)
+	_ = s.CreateNode(n, testUserID)
 
-	if err := s.UpdateNodeStatus(n.ID, "online"); err != nil {
+	if err := s.UpdateNodeStatus(n.ID, testUserID, "online"); err != nil {
 		t.Fatalf("UpdateNodeStatus: %v", err)
 	}
 
-	got, _ := s.GetNode(n.ID)
+	got, _ := s.GetNode(n.ID, testUserID)
 	if got.Status != "online" {
 		t.Errorf("expected status 'online', got %q", got.Status)
 	}
@@ -219,19 +222,19 @@ func TestUpdateNodeStatus(t *testing.T) {
 func TestUpdateNodeTraefik(t *testing.T) {
 	s := newTestStore(t)
 	n := sampleNode("traefik-test")
-	_ = s.CreateNode(n)
+	_ = s.CreateNode(n, testUserID)
 
-	if err := s.UpdateNodeTraefik(n.ID, true); err != nil {
+	if err := s.UpdateNodeTraefik(n.ID, testUserID, true); err != nil {
 		t.Fatalf("UpdateNodeTraefik: %v", err)
 	}
 
-	got, _ := s.GetNode(n.ID)
+	got, _ := s.GetNode(n.ID, testUserID)
 	if !got.TraefikEnabled {
 		t.Error("expected TraefikEnabled=true")
 	}
 
-	_ = s.UpdateNodeTraefik(n.ID, false)
-	got, _ = s.GetNode(n.ID)
+	_ = s.UpdateNodeTraefik(n.ID, testUserID, false)
+	got, _ = s.GetNode(n.ID, testUserID)
 	if got.TraefikEnabled {
 		t.Error("expected TraefikEnabled=false after disable")
 	}
@@ -239,7 +242,7 @@ func TestUpdateNodeTraefik(t *testing.T) {
 
 func TestCountNodes(t *testing.T) {
 	s := newTestStore(t)
-	count, err := s.CountNodes()
+	count, err := s.CountNodes(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,9 +250,9 @@ func TestCountNodes(t *testing.T) {
 		t.Fatalf("expected 0, got %d", count)
 	}
 
-	_ = s.CreateNode(sampleNode("n1"))
-	_ = s.CreateNode(sampleNode("n2"))
-	count, _ = s.CountNodes()
+	_ = s.CreateNode(sampleNode("n1"), testUserID)
+	_ = s.CreateNode(sampleNode("n2"), testUserID)
+	count, _ = s.CountNodes(testUserID)
 	if count != 2 {
 		t.Fatalf("expected 2, got %d", count)
 	}
@@ -261,11 +264,11 @@ func TestCreateApplication_GetApplication(t *testing.T) {
 	s := newTestStore(t)
 	a := sampleApp("myapp")
 
-	if err := s.CreateApplication(a); err != nil {
+	if err := s.CreateApplication(a, testUserID); err != nil {
 		t.Fatalf("CreateApplication: %v", err)
 	}
 
-	got, err := s.GetApplication(a.ID)
+	got, err := s.GetApplication(a.ID, testUserID)
 	if err != nil {
 		t.Fatalf("GetApplication: %v", err)
 	}
@@ -288,7 +291,7 @@ func TestCreateApplication_GetApplication(t *testing.T) {
 
 func TestGetApplication_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	got, err := s.GetApplication("nonexistent")
+	got, err := s.GetApplication("nonexistent", testUserID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -299,7 +302,7 @@ func TestGetApplication_NotFound(t *testing.T) {
 
 func TestListApplications_Empty(t *testing.T) {
 	s := newTestStore(t)
-	apps, err := s.ListApplications()
+	apps, err := s.ListApplications(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -310,10 +313,10 @@ func TestListApplications_Empty(t *testing.T) {
 
 func TestListApplications_Multiple(t *testing.T) {
 	s := newTestStore(t)
-	_ = s.CreateApplication(sampleApp("app1"))
-	_ = s.CreateApplication(sampleApp("app2"))
+	_ = s.CreateApplication(sampleApp("app1"), testUserID)
+	_ = s.CreateApplication(sampleApp("app2"), testUserID)
 
-	apps, err := s.ListApplications()
+	apps, err := s.ListApplications(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -325,12 +328,12 @@ func TestListApplications_Multiple(t *testing.T) {
 func TestDeleteApplication(t *testing.T) {
 	s := newTestStore(t)
 	a := sampleApp("del-app")
-	_ = s.CreateApplication(a)
+	_ = s.CreateApplication(a, testUserID)
 
-	if err := s.DeleteApplication(a.ID); err != nil {
+	if err := s.DeleteApplication(a.ID, testUserID); err != nil {
 		t.Fatalf("DeleteApplication: %v", err)
 	}
-	got, _ := s.GetApplication(a.ID)
+	got, _ := s.GetApplication(a.ID, testUserID)
 	if got != nil {
 		t.Fatal("expected nil after deletion")
 	}
@@ -341,12 +344,12 @@ func TestCreateApplication_WithEncryption(t *testing.T) {
 	a := sampleApp("enc-app")
 	a.EnvVars = `{"SECRET":"supersecret","KEY":"value"}`
 
-	if err := s.CreateApplication(a); err != nil {
+	if err := s.CreateApplication(a, testUserID); err != nil {
 		t.Fatalf("CreateApplication: %v", err)
 	}
 
 	// GetApplication should return decrypted value transparently.
-	got, err := s.GetApplication(a.ID)
+	got, err := s.GetApplication(a.ID, testUserID)
 	if err != nil {
 		t.Fatalf("GetApplication: %v", err)
 	}
@@ -359,9 +362,9 @@ func TestListApplications_WithEncryption(t *testing.T) {
 	s, _ := newTestStoreWithCipher(t)
 	a := sampleApp("enc-list-app")
 	a.EnvVars = `{"FOO":"bar"}`
-	_ = s.CreateApplication(a)
+	_ = s.CreateApplication(a, testUserID)
 
-	apps, err := s.ListApplications()
+	apps, err := s.ListApplications(testUserID)
 	if err != nil {
 		t.Fatalf("ListApplications: %v", err)
 	}
@@ -375,12 +378,12 @@ func TestListApplications_WithEncryption(t *testing.T) {
 
 func TestCountApplications(t *testing.T) {
 	s := newTestStore(t)
-	count, _ := s.CountApplications()
+	count, _ := s.CountApplications(testUserID)
 	if count != 0 {
 		t.Fatalf("expected 0, got %d", count)
 	}
-	_ = s.CreateApplication(sampleApp("countapp"))
-	count, _ = s.CountApplications()
+	_ = s.CreateApplication(sampleApp("countapp"), testUserID)
+	count, _ = s.CountApplications(testUserID)
 	if count != 1 {
 		t.Fatalf("expected 1, got %d", count)
 	}
@@ -392,10 +395,10 @@ func setupNodeAndApp(t *testing.T, s *store.Store) (*models.Node, *models.Applic
 	t.Helper()
 	n := sampleNode("dep-node")
 	a := sampleApp("dep-app")
-	if err := s.CreateNode(n); err != nil {
+	if err := s.CreateNode(n, testUserID); err != nil {
 		t.Fatalf("CreateNode: %v", err)
 	}
-	if err := s.CreateApplication(a); err != nil {
+	if err := s.CreateApplication(a, testUserID); err != nil {
 		t.Fatalf("CreateApplication: %v", err)
 	}
 	return n, a
@@ -418,11 +421,11 @@ func TestCreateDeployment_GetDeployment(t *testing.T) {
 	n, a := setupNodeAndApp(t, s)
 	d := sampleDeployment(a.ID, n.ID)
 
-	if err := s.CreateDeployment(d); err != nil {
+	if err := s.CreateDeployment(d, testUserID); err != nil {
 		t.Fatalf("CreateDeployment: %v", err)
 	}
 
-	got, err := s.GetDeployment(d.ID)
+	got, err := s.GetDeployment(d.ID, testUserID)
 	if err != nil {
 		t.Fatalf("GetDeployment: %v", err)
 	}
@@ -449,7 +452,7 @@ func TestCreateDeployment_GetDeployment(t *testing.T) {
 
 func TestGetDeployment_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	got, err := s.GetDeployment("nonexistent")
+	got, err := s.GetDeployment("nonexistent", testUserID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -461,9 +464,9 @@ func TestGetDeployment_NotFound(t *testing.T) {
 func TestListDeployments(t *testing.T) {
 	s := newTestStore(t)
 	n, a := setupNodeAndApp(t, s)
-	_ = s.CreateDeployment(sampleDeployment(a.ID, n.ID))
+	_ = s.CreateDeployment(sampleDeployment(a.ID, n.ID), testUserID)
 
-	deps, err := s.ListDeployments()
+	deps, err := s.ListDeployments(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -475,9 +478,9 @@ func TestListDeployments(t *testing.T) {
 func TestGetDeploymentsByApplicationID(t *testing.T) {
 	s := newTestStore(t)
 	n, a := setupNodeAndApp(t, s)
-	_ = s.CreateDeployment(sampleDeployment(a.ID, n.ID))
+	_ = s.CreateDeployment(sampleDeployment(a.ID, n.ID), testUserID)
 
-	deps, err := s.GetDeploymentsByApplicationID(a.ID)
+	deps, err := s.GetDeploymentsByApplicationID(a.ID, testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -491,7 +494,7 @@ func TestGetDeploymentsByApplicationID(t *testing.T) {
 
 func TestGetDeploymentsByApplicationID_Empty(t *testing.T) {
 	s := newTestStore(t)
-	deps, err := s.GetDeploymentsByApplicationID("no-such-app")
+	deps, err := s.GetDeploymentsByApplicationID("no-such-app", testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -504,13 +507,13 @@ func TestUpdateDeploymentStatus(t *testing.T) {
 	s := newTestStore(t)
 	n, a := setupNodeAndApp(t, s)
 	d := sampleDeployment(a.ID, n.ID)
-	_ = s.CreateDeployment(d)
+	_ = s.CreateDeployment(d, testUserID)
 
-	if err := s.UpdateDeploymentStatus(d.ID, "running", "abc123containerid"); err != nil {
+	if err := s.UpdateDeploymentStatus(d.ID, testUserID, "running", "abc123containerid"); err != nil {
 		t.Fatalf("UpdateDeploymentStatus: %v", err)
 	}
 
-	got, _ := s.GetDeployment(d.ID)
+	got, _ := s.GetDeployment(d.ID, testUserID)
 	if got.Status != "running" {
 		t.Errorf("expected running, got %q", got.Status)
 	}
@@ -523,12 +526,12 @@ func TestDeleteDeployment(t *testing.T) {
 	s := newTestStore(t)
 	n, a := setupNodeAndApp(t, s)
 	d := sampleDeployment(a.ID, n.ID)
-	_ = s.CreateDeployment(d)
+	_ = s.CreateDeployment(d, testUserID)
 
-	if err := s.DeleteDeployment(d.ID); err != nil {
+	if err := s.DeleteDeployment(d.ID, testUserID); err != nil {
 		t.Fatalf("DeleteDeployment: %v", err)
 	}
-	got, _ := s.GetDeployment(d.ID)
+	got, _ := s.GetDeployment(d.ID, testUserID)
 	if got != nil {
 		t.Fatal("expected nil after deletion")
 	}
@@ -536,7 +539,7 @@ func TestDeleteDeployment(t *testing.T) {
 
 func TestCountDeploymentsByStatus(t *testing.T) {
 	s := newTestStore(t)
-	counts, err := s.CountDeploymentsByStatus()
+	counts, err := s.CountDeploymentsByStatus(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -546,8 +549,8 @@ func TestCountDeploymentsByStatus(t *testing.T) {
 
 	n, a := setupNodeAndApp(t, s)
 	d := sampleDeployment(a.ID, n.ID)
-	_ = s.CreateDeployment(d)
-	_ = s.UpdateDeploymentStatus(d.ID, "running", "cid")
+	_ = s.CreateDeployment(d, testUserID)
+	_ = s.UpdateDeploymentStatus(d.ID, testUserID, "running", "cid")
 
 	d2 := &models.Deployment{
 		ID:            "dep2",
@@ -557,9 +560,9 @@ func TestCountDeploymentsByStatus(t *testing.T) {
 		Status:        "failed",
 		CreatedAt:     time.Now().UTC(),
 	}
-	_ = s.CreateDeployment(d2)
+	_ = s.CreateDeployment(d2, testUserID)
 
-	counts, err = s.CountDeploymentsByStatus()
+	counts, err = s.CountDeploymentsByStatus(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -621,5 +624,113 @@ func TestSetSetting_MultipleKeys(t *testing.T) {
 	}
 	if v2 != "val2" {
 		t.Errorf("key2: got %q", v2)
+	}
+}
+
+// ---- User settings ----
+
+func TestGetUserSetting_Missing(t *testing.T) {
+	s := newTestStore(t)
+	val, err := s.GetUserSetting(testUserID, "no_key")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if val != "" {
+		t.Errorf("expected empty, got %q", val)
+	}
+}
+
+func TestSetUserSetting_GetUserSetting(t *testing.T) {
+	s := newTestStore(t)
+	// Need a real user for FK constraint
+	_, err := s.UpsertUser("sub123", "u@example.com", "U", "")
+	if err != nil {
+		t.Fatalf("UpsertUser: %v", err)
+	}
+	u, _ := s.GetUserByWebhookToken("") // just to get a user back
+	_ = u
+
+	// Use the upserted user's actual ID
+	u2, _ := s.UpsertUser("sub123", "u@example.com", "U", "")
+	if err := s.SetUserSetting(u2.ID, "mykey", "myval"); err != nil {
+		t.Fatalf("SetUserSetting: %v", err)
+	}
+	val, err := s.GetUserSetting(u2.ID, "mykey")
+	if err != nil {
+		t.Fatalf("GetUserSetting: %v", err)
+	}
+	if val != "myval" {
+		t.Errorf("expected 'myval', got %q", val)
+	}
+}
+
+// ---- Users ----
+
+func TestUpsertUser_Create(t *testing.T) {
+	s := newTestStore(t)
+	u, err := s.UpsertUser("google-sub-1", "a@b.com", "Alice", "https://img/a.jpg")
+	if err != nil {
+		t.Fatalf("UpsertUser: %v", err)
+	}
+	if u == nil {
+		t.Fatal("expected non-nil user")
+	}
+	if u.Email != "a@b.com" {
+		t.Errorf("email: got %q", u.Email)
+	}
+	if u.Name != "Alice" {
+		t.Errorf("name: got %q", u.Name)
+	}
+	// webhook_token should be auto-created
+	tok, err := s.GetUserSetting(u.ID, "webhook_token")
+	if err != nil {
+		t.Fatalf("GetUserSetting: %v", err)
+	}
+	if tok == "" {
+		t.Error("expected webhook_token to be auto-set")
+	}
+}
+
+func TestUpsertUser_Update(t *testing.T) {
+	s := newTestStore(t)
+	u1, _ := s.UpsertUser("google-sub-2", "old@b.com", "Old Name", "")
+	u2, err := s.UpsertUser("google-sub-2", "new@b.com", "New Name", "avatar.jpg")
+	if err != nil {
+		t.Fatalf("UpsertUser update: %v", err)
+	}
+	if u1.ID != u2.ID {
+		t.Error("expected same ID on upsert")
+	}
+	if u2.Email != "new@b.com" {
+		t.Errorf("email not updated: got %q", u2.Email)
+	}
+	if u2.Name != "New Name" {
+		t.Errorf("name not updated: got %q", u2.Name)
+	}
+}
+
+func TestGetUserByWebhookToken(t *testing.T) {
+	s := newTestStore(t)
+	u, _ := s.UpsertUser("google-sub-3", "c@d.com", "Carol", "")
+	_ = s.SetUserSetting(u.ID, "webhook_token", "my-token-xyz")
+
+	found, err := s.GetUserByWebhookToken("my-token-xyz")
+	if err != nil {
+		t.Fatalf("GetUserByWebhookToken: %v", err)
+	}
+	if found == nil {
+		t.Fatal("expected to find user by webhook token")
+	}
+	if found.ID != u.ID {
+		t.Errorf("expected id %q, got %q", u.ID, found.ID)
+	}
+
+	// Non-existent token
+	notFound, err := s.GetUserByWebhookToken("bad-token")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if notFound != nil {
+		t.Fatal("expected nil for unknown token")
 	}
 }

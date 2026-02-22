@@ -42,13 +42,14 @@ export default function Settings() {
   const [copied, setCopied] = useState(false)
   const [urlCopied, setUrlCopied] = useState(false)
 
-  const webhookUrl = `${window.location.origin}/api/webhooks/github`
+  const [webhookUrl, setWebhookUrl] = useState('')
 
   useEffect(() => {
     settings.get().then(s => {
       setForm(prev => ({ ...prev, github_username: s.github_username }))
       setTokenConfigured(s.github_token === 'configured')
       setWebhookSecretConfigured(s.webhook_secret === 'configured')
+      if (s.webhook_url) setWebhookUrl(s.webhook_url)
     }).catch(e => setError(e.message))
   }, [])
 

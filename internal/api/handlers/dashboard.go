@@ -15,9 +15,13 @@ func NewDashboardHandler(s *store.Store) *DashboardHandler {
 }
 
 func (h *DashboardHandler) Stats(w http.ResponseWriter, r *http.Request) {
-	nodeCount, _ := h.store.CountNodes()
-	appCount, _ := h.store.CountApplications()
-	deploymentCounts, _ := h.store.CountDeploymentsByStatus()
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	nodeCount, _ := h.store.CountNodes(userID)
+	appCount, _ := h.store.CountApplications(userID)
+	deploymentCounts, _ := h.store.CountDeploymentsByStatus(userID)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"nodes":        nodeCount,

@@ -5,24 +5,73 @@ import (
 	"strings"
 
 	"github.com/gsarma/localisprod-v2/internal/api/handlers"
+	"github.com/gsarma/localisprod-v2/internal/auth"
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
 
-func NewRouter(s *store.Store) http.Handler {
+func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTService, appURL string) http.Handler {
 	nodeH := handlers.NewNodeHandler(s)
 	appH := handlers.NewApplicationHandler(s)
 	depH := handlers.NewDeploymentHandler(s)
 	dashH := handlers.NewDashboardHandler(s)
-	settingsH := handlers.NewSettingsHandler(s)
+	settingsH := handlers.NewSettingsHandler(s, appURL)
 	githubH := handlers.NewGithubHandler(s)
 	webhookH := handlers.NewWebhookHandler(s)
+	authH := handlers.NewAuthHandler(s, oauthSvc, jwtSvc, appURL)
 
-	mux := http.NewServeMux()
+	// Unprotected mux (auth + webhooks)
+	publicMux := http.NewServeMux()
+	publicMux.HandleFunc("/api/auth/google", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			authH.GoogleLogin(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	publicMux.HandleFunc("/api/auth/google/callback", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			authH.GoogleCallback(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	// Per-user webhook: /api/webhooks/github/{token}
+	publicMux.HandleFunc("/api/webhooks/github/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.NotFound(w, r)
+			return
+		}
+		token := strings.TrimPrefix(r.URL.Path, "/api/webhooks/github/")
+		token = strings.TrimSuffix(token, "/")
+		if token == "" {
+			http.NotFound(w, r)
+			return
+		}
+		webhookH.GithubForUser(w, r, token)
+	})
 
-	mux.HandleFunc("/api/stats", dashH.Stats)
+	// Protected mux (all other API routes require JWT)
+	protectedMux := http.NewServeMux()
+
+	protectedMux.HandleFunc("/api/auth/logout", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			authH.Logout(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	protectedMux.HandleFunc("/api/auth/me", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			authH.Me(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	protectedMux.HandleFunc("/api/stats", dashH.Stats)
 
 	// Settings
-	mux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			settingsH.Get(w, r)
@@ -34,7 +83,7 @@ func NewRouter(s *store.Store) http.Handler {
 	})
 
 	// GitHub
-	mux.HandleFunc("/api/github/repos", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/github/repos", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			githubH.ListRepos(w, r)
 		} else {
@@ -43,7 +92,7 @@ func NewRouter(s *store.Store) http.Handler {
 	})
 
 	// Nodes
-	mux.HandleFunc("/api/nodes", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/nodes", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			nodeH.List(w, r)
@@ -54,7 +103,7 @@ func NewRouter(s *store.Store) http.Handler {
 		}
 	})
 
-	mux.HandleFunc("/api/nodes/", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/nodes/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/nodes/")
 		parts := strings.SplitN(path, "/", 2)
 		id := parts[0]
@@ -93,7 +142,7 @@ func NewRouter(s *store.Store) http.Handler {
 	})
 
 	// Applications
-	mux.HandleFunc("/api/applications", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/applications", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			appH.List(w, r)
@@ -104,7 +153,7 @@ func NewRouter(s *store.Store) http.Handler {
 		}
 	})
 
-	mux.HandleFunc("/api/applications/", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/applications/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/applications/")
 		id := strings.TrimSuffix(path, "/")
 		if id == "" {
@@ -122,7 +171,7 @@ func NewRouter(s *store.Store) http.Handler {
 	})
 
 	// Deployments
-	mux.HandleFunc("/api/deployments", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/deployments", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			depH.List(w, r)
@@ -133,7 +182,7 @@ func NewRouter(s *store.Store) http.Handler {
 		}
 	})
 
-	mux.HandleFunc("/api/deployments/", func(w http.ResponseWriter, r *http.Request) {
+	protectedMux.HandleFunc("/api/deployments/", func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/deployments/")
 		parts := strings.SplitN(path, "/", 2)
 		id := parts[0]
@@ -171,23 +220,25 @@ func NewRouter(s *store.Store) http.Handler {
 		}
 	})
 
-	// Webhooks (outside CORS — GitHub POSTs directly)
-	mux.HandleFunc("/api/webhooks/github", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			webhookH.Github(w, r)
-			return
-		}
-		http.NotFound(w, r)
-	})
+	// Wrap protected routes with JWT middleware
+	protectedHandler := jwtSvc.Middleware(protectedMux)
 
-	return corsMiddleware(mux)
+	// Main mux: public routes first, then protected
+	mainMux := http.NewServeMux()
+	mainMux.Handle("/api/auth/google", publicMux)
+	mainMux.Handle("/api/auth/google/callback", publicMux)
+	mainMux.Handle("/api/webhooks/github/", publicMux)
+	mainMux.Handle("/api/", protectedHandler)
+
+	return corsMiddleware(mainMux, appURL)
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+func corsMiddleware(next http.Handler, appURL string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Origin", appURL)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return

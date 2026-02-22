@@ -38,7 +38,7 @@ func TestApplicationCreate_InvalidJSON(t *testing.T) {
 	h := handlers.NewApplicationHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/applications", nil)
+	r := withUserID(httptest.NewRequest(http.MethodPost, "/api/applications", nil))
 	r.Header.Set("Content-Type", "application/json")
 	h.Create(rec, r)
 
@@ -190,7 +190,7 @@ func TestApplicationDelete_NotFound(t *testing.T) {
 	h := handlers.NewApplicationHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodDelete, "/api/applications/bad", nil)
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/applications/bad", nil))
 	h.Delete(rec, r, "bad")
 
 	if rec.Code != http.StatusNotFound {
@@ -204,7 +204,7 @@ func TestApplicationDelete_Success(t *testing.T) {
 	a := mustCreateApp(t, s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodDelete, "/api/applications/"+a.ID, nil)
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/applications/"+a.ID, nil))
 	h.Delete(rec, r, a.ID)
 
 	if rec.Code != http.StatusNoContent {

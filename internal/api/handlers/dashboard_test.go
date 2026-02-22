@@ -40,7 +40,7 @@ func TestDashboardStats_WithData(t *testing.T) {
 	n := mustCreateNode(t, s)
 	a := mustCreateApp(t, s)
 	d := mustCreateDeployment(t, s, a.ID, n.ID)
-	_ = s.UpdateDeploymentStatus(d.ID, "running", "cid123")
+	_ = s.UpdateDeploymentStatus(d.ID, testUserID, "running", "cid123")
 
 	rec := httptest.NewRecorder()
 	h.Stats(rec, getRequest("/api/stats"))

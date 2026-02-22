@@ -82,7 +82,7 @@ func TestGithubListRepos_Success(t *testing.T) {
 	})
 
 	s := newTestStore(t)
-	_ = s.SetSetting("github_token", "ghp_testtoken")
+	_ = s.SetUserSetting(testUserID, "github_token", "ghp_testtoken")
 	h := handlers.NewGithubHandler(s)
 
 	rec := httptest.NewRecorder()
@@ -112,7 +112,7 @@ func TestGithubListRepos_APIError(t *testing.T) {
 	})
 
 	s := newTestStore(t)
-	_ = s.SetSetting("github_token", "bad-token")
+	_ = s.SetUserSetting(testUserID, "github_token", "bad-token")
 	h := handlers.NewGithubHandler(s)
 
 	rec := httptest.NewRecorder()
@@ -130,7 +130,7 @@ func TestGithubListRepos_InvalidJSON(t *testing.T) {
 	})
 
 	s := newTestStore(t)
-	_ = s.SetSetting("github_token", "sometoken")
+	_ = s.SetUserSetting(testUserID, "github_token", "sometoken")
 	h := handlers.NewGithubHandler(s)
 
 	rec := httptest.NewRecorder()

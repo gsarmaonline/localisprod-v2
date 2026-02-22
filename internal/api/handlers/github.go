@@ -25,7 +25,11 @@ type githubRepo struct {
 }
 
 func (h *GithubHandler) ListRepos(w http.ResponseWriter, r *http.Request) {
-	token, err := h.store.GetSetting("github_token")
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	token, err := h.store.GetUserSetting(userID, "github_token")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

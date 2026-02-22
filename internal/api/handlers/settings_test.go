@@ -10,7 +10,7 @@ import (
 
 func TestSettingsGet_Empty(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewSettingsHandler(s)
+	h := handlers.NewSettingsHandler(s, "http://localhost:8080")
 
 	rec := httptest.NewRecorder()
 	h.Get(rec, getRequest("/api/settings"))
@@ -35,11 +35,11 @@ func TestSettingsGet_Empty(t *testing.T) {
 
 func TestSettingsGet_WithValues_TokenMasked(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewSettingsHandler(s)
+	h := handlers.NewSettingsHandler(s, "http://localhost:8080")
 
-	_ = s.SetSetting("github_username", "myuser")
-	_ = s.SetSetting("github_token", "ghp_supersecrettoken")
-	_ = s.SetSetting("webhook_secret", "mysecret")
+	_ = s.SetUserSetting(testUserID, "github_username", "myuser")
+	_ = s.SetUserSetting(testUserID, "github_token", "ghp_supersecrettoken")
+	_ = s.SetUserSetting(testUserID, "webhook_secret", "mysecret")
 
 	rec := httptest.NewRecorder()
 	h.Get(rec, getRequest("/api/settings"))
@@ -65,7 +65,7 @@ func TestSettingsGet_WithValues_TokenMasked(t *testing.T) {
 
 func TestSettingsUpdate_Success(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewSettingsHandler(s)
+	h := handlers.NewSettingsHandler(s, "http://localhost:8080")
 
 	rec := httptest.NewRecorder()
 	r := postJSON(t, "/api/settings", map[string]any{
@@ -86,16 +86,16 @@ func TestSettingsUpdate_Success(t *testing.T) {
 		t.Errorf("expected status='ok', got %q", resp["status"])
 	}
 
-	// Verify values are persisted.
-	username, _ := s.GetSetting("github_username")
+	// Verify values are persisted in user settings.
+	username, _ := s.GetUserSetting(testUserID, "github_username")
 	if username != "newuser" {
 		t.Errorf("expected stored username='newuser', got %q", username)
 	}
-	token, _ := s.GetSetting("github_token")
+	token, _ := s.GetUserSetting(testUserID, "github_token")
 	if token != "newtoken" {
 		t.Errorf("expected stored token='newtoken', got %q", token)
 	}
-	webhookSecret, _ := s.GetSetting("webhook_secret")
+	webhookSecret, _ := s.GetUserSetting(testUserID, "webhook_secret")
 	if webhookSecret != "newsecret" {
 		t.Errorf("expected stored webhook_secret='newsecret', got %q", webhookSecret)
 	}
@@ -103,10 +103,10 @@ func TestSettingsUpdate_Success(t *testing.T) {
 
 func TestSettingsUpdate_EmptyWebhookSecret_NotOverwritten(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewSettingsHandler(s)
+	h := handlers.NewSettingsHandler(s, "http://localhost:8080")
 
 	// Set an existing webhook secret.
-	_ = s.SetSetting("webhook_secret", "existing-secret")
+	_ = s.SetUserSetting(testUserID, "webhook_secret", "existing-secret")
 
 	// Update with empty webhook_secret — should not overwrite.
 	rec := httptest.NewRecorder()
@@ -123,7 +123,7 @@ func TestSettingsUpdate_EmptyWebhookSecret_NotOverwritten(t *testing.T) {
 	}
 
 	// Secret should remain unchanged.
-	secret, _ := s.GetSetting("webhook_secret")
+	secret, _ := s.GetUserSetting(testUserID, "webhook_secret")
 	if secret != "existing-secret" {
 		t.Errorf("expected existing secret preserved, got %q", secret)
 	}
@@ -131,10 +131,10 @@ func TestSettingsUpdate_EmptyWebhookSecret_NotOverwritten(t *testing.T) {
 
 func TestSettingsUpdate_InvalidJSON(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewSettingsHandler(s)
+	h := handlers.NewSettingsHandler(s, "http://localhost:8080")
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPut, "/api/settings", nil)
+	r := withUserID(httptest.NewRequest(http.MethodPut, "/api/settings", nil))
 	r.Header.Set("Content-Type", "application/json")
 	h.Update(rec, r)
 
