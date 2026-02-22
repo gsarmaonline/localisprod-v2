@@ -1,1 +1,77 @@
-# localisprod-v2
+# Localisprod v2 — Cluster Manager
+
+A cluster management system for deploying Docker containers to SSH-accessible nodes.
+
+## Features
+
+- Register SSH nodes (host, port, username, private key)
+- Define applications (Docker image, env vars, port mappings, command)
+- Deploy applications as Docker containers onto nodes via SSH
+- View container logs, restart or stop deployments
+- Dashboard with live counts across nodes, apps, and deployment statuses
+
+## Tech Stack
+
+- **Backend**: Go (`net/http`, `golang.org/x/crypto/ssh`, `modernc.org/sqlite`)
+- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
+- **Database**: SQLite (`cluster.db`)
+
+## Getting Started
+
+### Prerequisites
+
+- Go 1.21+
+- Node.js 18+
+
+### Development
+
+```bash
+# Terminal 1 — Go API server on :8080
+make dev-backend
+
+# Terminal 2 — Vite dev server on :5173 (proxies /api → :8080)
+make dev-frontend
+```
+
+Open http://localhost:5173
+
+### Production
+
+```bash
+# Build frontend + backend binary
+make build
+
+# Run the server (serves API + static frontend on :8080)
+make run
+```
+
+Or run the binary directly:
+
+```bash
+./bin/server
+```
+
+Environment variables:
+
+| Variable  | Default      | Description             |
+|-----------|--------------|-------------------------|
+| `PORT`    | `8080`       | HTTP server port        |
+| `DB_PATH` | `cluster.db` | Path to SQLite database |
+
+## API
+
+| Method | Path                              | Description                    |
+|--------|-----------------------------------|--------------------------------|
+| POST   | `/api/nodes`                      | Register a node                |
+| GET    | `/api/nodes`                      | List nodes                     |
+| DELETE | `/api/nodes/:id`                  | Delete node                    |
+| POST   | `/api/nodes/:id/ping`             | Test SSH connectivity          |
+| POST   | `/api/applications`               | Create application             |
+| GET    | `/api/applications`               | List applications               |
+| DELETE | `/api/applications/:id`           | Delete application             |
+| POST   | `/api/deployments`                | Deploy app to node             |
+| GET    | `/api/deployments`                | List deployments               |
+| DELETE | `/api/deployments/:id`            | Stop + remove deployment       |
+| POST   | `/api/deployments/:id/restart`    | Restart container              |
+| GET    | `/api/deployments/:id/logs`       | Fetch last 200 log lines       |
+| GET    | `/api/stats`                      | Dashboard counts               |
