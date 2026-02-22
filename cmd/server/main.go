@@ -38,19 +38,17 @@ func main() {
 		log.Fatal("JWT_SECRET is required (generate with: openssl rand -base64 32)")
 	}
 
-	var cipher *secret.Cipher
-	if keyB64 := os.Getenv("SECRET_KEY"); keyB64 != "" {
-		keyBytes, err := base64.StdEncoding.DecodeString(keyB64)
-		if err != nil || len(keyBytes) != 32 {
-			log.Fatalf("SECRET_KEY must be a base64-encoded 32-byte key (generate with: openssl rand -base64 32)")
-		}
-		cipher, err = secret.New(keyBytes)
-		if err != nil {
-			log.Fatalf("failed to init cipher: %v", err)
-		}
-		log.Println("encryption enabled: env vars will be encrypted at rest")
-	} else {
-		log.Println("WARNING: SECRET_KEY not set — env vars stored in plaintext. Set SECRET_KEY to enable encryption.")
+	keyB64 := os.Getenv("SECRET_KEY")
+	if keyB64 == "" {
+		log.Fatal("SECRET_KEY is required (generate with: openssl rand -base64 32)")
+	}
+	keyBytes, err := base64.StdEncoding.DecodeString(keyB64)
+	if err != nil || len(keyBytes) != 32 {
+		log.Fatalf("SECRET_KEY must be a base64-encoded 32-byte key (generate with: openssl rand -base64 32)")
+	}
+	cipher, err := secret.New(keyBytes)
+	if err != nil {
+		log.Fatalf("failed to init cipher: %v", err)
 	}
 
 	s, err := store.New(dbPath, cipher)
@@ -61,7 +59,13 @@ func main() {
 	jwtSvc := auth.NewJWTService(jwtSecret)
 
 	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	if googleClientID == "" {
+		log.Fatal("GOOGLE_CLIENT_ID is required")
+	}
 	googleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+	if googleClientSecret == "" {
+		log.Fatal("GOOGLE_CLIENT_SECRET is required")
+	}
 	oauthSvc := auth.NewOAuthService(googleClientID, googleClientSecret, appURL)
 
 	router := api.NewRouter(s, oauthSvc, jwtSvc, appURL)
