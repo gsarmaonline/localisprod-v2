@@ -1,8 +1,8 @@
 .PHONY: dev-backend dev-frontend build build-frontend build-backend run clean
 
-# Run Go backend in development mode
+# Run Go backend with auto-reload (requires: go install github.com/air-verse/air@latest)
 dev-backend:
-	go run ./cmd/server/main.go
+	air
 
 # Run Vite frontend dev server (proxies /api to :8080)
 dev-frontend:

@@ -33,6 +33,7 @@ go.work.sum
 
 # Project-specific
 bin/
+tmp/
 cluster.db
 web/node_modules/
 web/dist/
