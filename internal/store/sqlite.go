@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   private_key TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'unknown',
   is_local INTEGER NOT NULL DEFAULT 0,
+  traefik_enabled INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -69,6 +70,8 @@ CREATE TABLE IF NOT EXISTS applications (
   env_vars TEXT NOT NULL DEFAULT '{}',
   ports TEXT NOT NULL DEFAULT '[]',
   command TEXT NOT NULL DEFAULT '',
+  github_repo TEXT NOT NULL DEFAULT '',
+  domain TEXT NOT NULL DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -132,9 +132,9 @@ func (h *WebhookHandler) Github(w http.ResponseWriter, r *http.Request) {
 				ContainerName: d.ContainerName,
 				Image:         app.DockerImage,
 				Ports:         ports,
-				EnvVars:       envVars,
 				Command:       app.Command,
 			}
+			_ = envVars // env vars are embedded in the running container; redeploy reuses existing config
 			if app.Domain != "" {
 				containerPort := "80"
 				if len(ports) > 0 {
