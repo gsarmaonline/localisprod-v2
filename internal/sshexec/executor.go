@@ -3,6 +3,7 @@ package sshexec
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -14,6 +15,7 @@ import (
 // Runner abstracts over SSH and local execution.
 type Runner interface {
 	Run(cmd string) (string, error)
+	WriteFile(path, content string) error
 	Ping() error
 }
 
@@ -36,6 +38,10 @@ type LocalRunner struct{}
 func (l *LocalRunner) Run(cmd string) (string, error) {
 	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 	return strings.TrimSpace(string(out)), err
+}
+
+func (l *LocalRunner) WriteFile(path, content string) error {
+	return os.WriteFile(path, []byte(content), 0600)
 }
 
 func (l *LocalRunner) Ping() error {
@@ -89,6 +95,30 @@ func (c *Client) Run(cmd string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+// WriteFile writes content to path on the remote host with mode 0600.
+// Content is piped via stdin to avoid exposing it in the process list.
+func (c *Client) WriteFile(path, content string) error {
+	client, err := c.dial()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	session, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("new session: %w", err)
+	}
+	defer session.Close()
+
+	session.Stdin = strings.NewReader(content)
+	// umask 177 ensures the file is created with mode 0600
+	cmd := fmt.Sprintf("(umask 177 && cat > %s)", shellEscape(path))
+	if out, err := session.CombinedOutput(cmd); err != nil {
+		return fmt.Errorf("write file %s: %s: %w", path, strings.TrimSpace(string(out)), err)
+	}
+	return nil
+}
+
 func (c *Client) Ping() error {
 	_, err := c.Run("echo pong")
 	return err
@@ -104,12 +134,14 @@ type RunConfig struct {
 	ContainerName string
 	Image         string
 	Ports         []string
-	EnvVars       map[string]string
+	EnvFilePath   string            // path to --env-file on the node; "" = no env file
 	Command       string
 	Network       string            // "" = no --network flag
 	Labels        map[string]string // arbitrary docker labels
 }
 
+// DockerRunCmd builds a docker run command. Env vars are passed via --env-file
+// to avoid exposing values in the process list or shell history.
 func DockerRunCmd(cfg RunConfig) string {
 	var sb strings.Builder
 	sb.WriteString("docker run -d --name ")
@@ -120,9 +152,9 @@ func DockerRunCmd(cfg RunConfig) string {
 		sb.WriteString(shellEscape(p))
 	}
 
-	for k, v := range cfg.EnvVars {
-		sb.WriteString(" -e ")
-		sb.WriteString(shellEscape(k + "=" + v))
+	if cfg.EnvFilePath != "" {
+		sb.WriteString(" --env-file ")
+		sb.WriteString(shellEscape(cfg.EnvFilePath))
 	}
 
 	if cfg.Network != "" {
@@ -183,6 +215,11 @@ func DockerRestartCmd(containerName string) string {
 
 func DockerLogsCmd(containerName string) string {
 	return fmt.Sprintf("docker logs --tail 200 %s", shellEscape(containerName))
+}
+
+// RemoveFileCmd returns a command to delete a file (best-effort, no error on missing).
+func RemoveFileCmd(path string) string {
+	return fmt.Sprintf("rm -f %s", shellEscape(path))
 }
 
 // shellEscape wraps a string in single quotes for safe shell usage.

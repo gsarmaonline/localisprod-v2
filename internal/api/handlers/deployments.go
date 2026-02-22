@@ -92,11 +92,34 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Write env vars to a temporary file on the node so they are never
+	// exposed in the process list or shell history.
+	var envFilePath string
+	if len(envVars) > 0 {
+		envFilePath = fmt.Sprintf("/tmp/%s.env", containerName)
+		var buf strings.Builder
+		for k, v := range envVars {
+			buf.WriteString(k)
+			buf.WriteByte('=')
+			buf.WriteString(v)
+			buf.WriteByte('\n')
+		}
+		if err := runner.WriteFile(envFilePath, buf.String()); err != nil {
+			_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")
+			deployment.Status = "failed"
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"deployment": deployment,
+				"error":      "failed to write env file: " + err.Error(),
+			})
+			return
+		}
+	}
+
 	cfg := sshexec.RunConfig{
 		ContainerName: containerName,
 		Image:         app.DockerImage,
 		Ports:         ports,
-		EnvVars:       envVars,
+		EnvFilePath:   envFilePath,
 		Command:       app.Command,
 	}
 
@@ -114,6 +137,11 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	cmd := sshexec.DockerRunCmd(cfg)
 	output, runErr := runner.Run(cmd)
+
+	// Always remove the env file — docker run -d has already loaded it.
+	if envFilePath != "" {
+		_, _ = runner.Run(sshexec.RemoveFileCmd(envFilePath))
+	}
 
 	if runErr != nil {
 		_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")

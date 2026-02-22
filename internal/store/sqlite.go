@@ -6,24 +6,40 @@ import (
 	"time"
 
 	"github.com/gsarma/localisprod-v2/internal/models"
+	"github.com/gsarma/localisprod-v2/internal/secret"
 	_ "modernc.org/sqlite"
 )
 
 type Store struct {
-	db *sql.DB
+	db     *sql.DB
+	cipher *secret.Cipher // nil → plaintext storage
 }
 
-func New(path string) (*Store, error) {
+func New(path string, cipher *secret.Cipher) (*Store, error) {
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
+	s := &Store{db: db, cipher: cipher}
 	if err := s.migrate(); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	return s, nil
+}
+
+func (s *Store) encryptEnvVars(plain string) (string, error) {
+	if s.cipher == nil {
+		return plain, nil
+	}
+	return s.cipher.Encrypt(plain)
+}
+
+func (s *Store) decryptEnvVars(stored string) (string, error) {
+	if s.cipher == nil {
+		return stored, nil
+	}
+	return s.cipher.Decrypt(stored)
 }
 
 func (s *Store) migrate() error {
@@ -135,10 +151,14 @@ func (s *Store) DeleteNode(id string) error {
 // Applications
 
 func (s *Store) CreateApplication(a *models.Application) error {
-	_, err := s.db.Exec(
+	envVars, err := s.encryptEnvVars(a.EnvVars)
+	if err != nil {
+		return fmt.Errorf("encrypt env_vars: %w", err)
+	}
+	_, err = s.db.Exec(
 		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, a.EnvVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.CreatedAt,
+		a.ID, a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.CreatedAt,
 	)
 	return err
 }
@@ -155,6 +175,9 @@ func (s *Store) ListApplications() ([]*models.Application, error) {
 		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt); err != nil {
 			return nil, err
 		}
+		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
+			return nil, fmt.Errorf("decrypt env_vars for %s: %w", a.ID, err)
+		}
 		apps = append(apps, a)
 	}
 	return apps, rows.Err()
@@ -168,7 +191,13 @@ func (s *Store) GetApplication(id string) (*models.Application, error) {
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
-	return a, err
+	if err != nil {
+		return nil, err
+	}
+	if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
+		return nil, fmt.Errorf("decrypt env_vars for %s: %w", id, err)
+	}
+	return a, nil
 }
 
 func (s *Store) DeleteApplication(id string) error {

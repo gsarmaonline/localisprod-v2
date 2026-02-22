@@ -51,12 +51,18 @@ Or run the binary directly:
 ./bin/server
 ```
 
-Environment variables:
+Environment variables (can also be set in a `.env` file at the project root):
 
-| Variable  | Default      | Description             |
-|-----------|--------------|-------------------------|
-| `PORT`    | `8080`       | HTTP server port        |
-| `DB_PATH` | `cluster.db` | Path to SQLite database |
+| Variable     | Default      | Description                                                        |
+|--------------|--------------|--------------------------------------------------------------------|
+| `PORT`       | `8080`       | HTTP server port                                                   |
+| `DB_PATH`    | `cluster.db` | Path to SQLite database                                            |
+| `SECRET_KEY` | *(unset)*    | Base64-encoded 32-byte key for AES-256-GCM encryption of env vars. Generate with `openssl rand -base64 32`. Without this, env vars are stored in plaintext. |
+
+`.env` example:
+```
+SECRET_KEY="<output of openssl rand -base64 32>"
+```
 
 ## API
 
