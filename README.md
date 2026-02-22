@@ -9,6 +9,7 @@ A cluster management system for deploying Docker containers to SSH-accessible no
 - Deploy applications as Docker containers onto nodes via SSH
 - View container logs, restart or stop deployments
 - Dashboard with live counts across nodes, apps, and deployment statuses
+- **GitHub webhook auto-redeploy**: automatically re-pulls and restarts containers when a new image is published to GHCR
 
 ## Tech Stack
 
@@ -75,3 +76,18 @@ Environment variables:
 | POST   | `/api/deployments/:id/restart`    | Restart container              |
 | GET    | `/api/deployments/:id/logs`       | Fetch last 200 log lines       |
 | GET    | `/api/stats`                      | Dashboard counts               |
+| GET    | `/api/settings`                   | Get GitHub + webhook settings  |
+| PUT    | `/api/settings`                   | Update GitHub + webhook settings |
+| POST   | `/api/webhooks/github`            | GitHub registry_package webhook |
+
+## GitHub Webhook Auto-Redeploy
+
+When an application has a `github_repo` set, you can configure a GitHub webhook so that publishing a new image to GHCR automatically redeploys all running deployments for that app.
+
+1. In **Settings**, enter a **Webhook Secret** and note the **Webhook URL** (`/api/webhooks/github`).
+2. In your GitHub repository → **Settings** → **Webhooks** → **Add webhook**:
+   - Payload URL: the Webhook URL from step 1
+   - Content type: `application/json`
+   - Secret: the same value as step 1
+   - Events: choose **Registry packages**
+3. On each new image publish, the server will `docker pull`, stop/remove the old container, and start a fresh one with the same config.

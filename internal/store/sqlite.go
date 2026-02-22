@@ -227,6 +227,31 @@ func (s *Store) GetDeployment(id string) (*models.Deployment, error) {
 	return d, err
 }
 
+func (s *Store) GetDeploymentsByApplicationID(appID string) ([]*models.Deployment, error) {
+	rows, err := s.db.Query(`
+		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
+		       a.name, n.name, a.docker_image
+		FROM deployments d
+		JOIN applications a ON d.application_id = a.id
+		JOIN nodes n ON d.node_id = n.id
+		WHERE d.application_id = ?
+		ORDER BY d.created_at DESC
+	`, appID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var deployments []*models.Deployment
+	for rows.Next() {
+		d := &models.Deployment{}
+		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
+			return nil, err
+		}
+		deployments = append(deployments, d)
+	}
+	return deployments, rows.Err()
+}
+
 func (s *Store) UpdateDeploymentStatus(id, status, containerID string) error {
 	_, err := s.db.Exec(`UPDATE deployments SET status = ?, container_id = ? WHERE id = ?`, status, containerID, id)
 	return err

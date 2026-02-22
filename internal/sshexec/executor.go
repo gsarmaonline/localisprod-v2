@@ -173,6 +173,10 @@ func TraefikLabels(routerName, domain, containerPort string) map[string]string {
 	}
 }
 
+func DockerPullCmd(image string) string {
+	return "docker pull " + shellEscape(image)
+}
+
 func DockerStopRemoveCmd(containerName string) string {
 	return fmt.Sprintf("docker stop %s && docker rm %s", shellEscape(containerName), shellEscape(containerName))
 }

@@ -15,6 +15,7 @@ func NewRouter(s *store.Store) http.Handler {
 	dashH := handlers.NewDashboardHandler(s)
 	settingsH := handlers.NewSettingsHandler(s)
 	githubH := handlers.NewGithubHandler(s)
+	webhookH := handlers.NewWebhookHandler(s)
 
 	mux := http.NewServeMux()
 
@@ -168,6 +169,15 @@ func NewRouter(s *store.Store) http.Handler {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	})
+
+	// Webhooks (outside CORS — GitHub POSTs directly)
+	mux.HandleFunc("/api/webhooks/github", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			webhookH.Github(w, r)
+			return
+		}
+		http.NotFound(w, r)
 	})
 
 	return corsMiddleware(mux)
