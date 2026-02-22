@@ -1,0 +1,14 @@
+# Copy to terraform.tfvars and fill in real values (never commit terraform.tfvars)
+
+do_token            = "dop_v1_..."
+ssh_key_fingerprint = "aa:bb:cc:..."       # from: doctl compute ssh-key list
+
+# Public repo  → use HTTPS URL, leave github_deploy_key empty
+# Private repo → use SSH URL + set github_deploy_key
+repo_url            = "git@github.com:gsarmaonline/localisprod-v2.git"
+github_deploy_key   = ""                   # paste private key for a GitHub deploy key (private repos only)
+
+secret_key          = ""                   # openssl rand -base64 32
+region              = "nyc3"
+droplet_size        = "s-1vcpu-1gb"
+port                = 8080

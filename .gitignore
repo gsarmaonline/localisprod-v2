@@ -37,3 +37,10 @@ tmp/
 cluster.db
 web/node_modules/
 web/dist/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfvars
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
