@@ -94,12 +94,13 @@ export const github = {
 // Settings
 export interface Settings {
   github_username: string
-  github_token: string  // "configured" | ""
+  github_token: string     // "configured" | ""
+  webhook_secret: string   // "configured" | ""
 }
 
 export const settings = {
   get: () => request<Settings>('/settings'),
-  update: (data: { github_username: string; github_token: string }) =>
+  update: (data: { github_username: string; github_token: string; webhook_secret?: string }) =>
     request<{ status: string }>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
 }
 

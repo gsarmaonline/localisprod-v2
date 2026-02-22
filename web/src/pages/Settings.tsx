@@ -31,18 +31,24 @@ jobs:
 `
 
 export default function Settings() {
-  const [form, setForm] = useState({ github_username: '', github_token: '' })
+  const [form, setForm] = useState({ github_username: '', github_token: '', webhook_secret: '' })
   const [tokenConfigured, setTokenConfigured] = useState(false)
+  const [webhookSecretConfigured, setWebhookSecretConfigured] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [yamlOpen, setYamlOpen] = useState(false)
+  const [webhookOpen, setWebhookOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [urlCopied, setUrlCopied] = useState(false)
+
+  const webhookUrl = `${window.location.origin}/api/webhooks/github`
 
   useEffect(() => {
     settings.get().then(s => {
       setForm(prev => ({ ...prev, github_username: s.github_username }))
       setTokenConfigured(s.github_token === 'configured')
+      setWebhookSecretConfigured(s.webhook_secret === 'configured')
     }).catch(e => setError(e.message))
   }, [])
 
@@ -52,8 +58,9 @@ export default function Settings() {
       setError(null)
       await settings.update(form)
       setSaved(true)
-      setTokenConfigured(form.github_token !== '')
-      setForm(prev => ({ ...prev, github_token: '' }))
+      setTokenConfigured(form.github_token !== '' || tokenConfigured)
+      if (form.webhook_secret !== '') setWebhookSecretConfigured(true)
+      setForm(prev => ({ ...prev, github_token: '', webhook_secret: '' }))
       setTimeout(() => setSaved(false), 3000)
     } catch (e: unknown) {
       setError((e as Error).message)
@@ -66,6 +73,13 @@ export default function Settings() {
     navigator.clipboard.writeText(WORKFLOW_YAML).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  const handleUrlCopy = () => {
+    navigator.clipboard.writeText(webhookUrl).then(() => {
+      setUrlCopied(true)
+      setTimeout(() => setUrlCopied(false), 2000)
     })
   }
 
@@ -120,6 +134,43 @@ export default function Settings() {
             </p>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Webhook Secret
+              {webhookSecretConfigured && (
+                <span className="ml-2 text-xs text-gray-400 font-normal">(leave blank to keep existing)</span>
+              )}
+            </label>
+            <input
+              type="password"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              value={form.webhook_secret}
+              onChange={e => setForm(prev => ({ ...prev, webhook_secret: e.target.value }))}
+              placeholder={webhookSecretConfigured ? '••••••••••••••••' : 'Enter a secret to secure the webhook'}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Used to verify incoming GitHub webhook requests. Choose any strong random string.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Webhook URL</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                className="flex-1 border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600 font-mono select-all"
+                value={webhookUrl}
+              />
+              <button
+                onClick={handleUrlCopy}
+                className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 whitespace-nowrap"
+              >
+                {urlCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+
           <div className="flex gap-2 items-center pt-1">
             <button
               onClick={handleSave}
@@ -153,6 +204,32 @@ export default function Settings() {
             >
               {copied ? 'Copied!' : 'Copy'}
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* Webhook setup instructions */}
+      <div className="mt-4 max-w-2xl">
+        <button
+          onClick={() => setWebhookOpen(v => !v)}
+          className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+        >
+          <span>{webhookOpen ? '▾' : '▸'}</span>
+          How to register the GitHub webhook for auto-redeploy
+        </button>
+        {webhookOpen && (
+          <div className="mt-3 bg-gray-50 border rounded-xl p-4 text-sm text-gray-700 space-y-2">
+            <ol className="list-decimal list-inside space-y-2">
+              <li>Go to your GitHub repository → <strong>Settings</strong> → <strong>Webhooks</strong> → <strong>Add webhook</strong></li>
+              <li>Set <strong>Payload URL</strong> to the Webhook URL shown above</li>
+              <li>Set <strong>Content type</strong> to <code className="bg-gray-200 px-1 rounded">application/json</code></li>
+              <li>Set <strong>Secret</strong> to the same value as the Webhook Secret you configured above</li>
+              <li>Under <em>Which events</em>, choose <strong>Let me select individual events</strong> and tick <strong>Registry packages</strong></li>
+              <li>Click <strong>Add webhook</strong>. GitHub will send a ping event to verify the URL.</li>
+            </ol>
+            <p className="text-xs text-gray-500 pt-1">
+              Once configured, every time a new image is published to GHCR for this repository, all running deployments for the matching application will be automatically updated.
+            </p>
           </div>
         )}
       </div>
