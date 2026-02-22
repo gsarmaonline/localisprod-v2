@@ -102,6 +102,35 @@ func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request, id string) 
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *NodeHandler) SetupTraefik(w http.ResponseWriter, r *http.Request, id string) {
+	node, err := h.store.GetNode(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if node == nil {
+		writeError(w, http.StatusNotFound, "node not found")
+		return
+	}
+
+	runner := sshexec.NewRunner(node)
+	output, runErr := runner.Run(sshexec.TraefikSetupCmd())
+
+	if runErr != nil {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status": "error",
+			"output": output + "\n" + runErr.Error(),
+		})
+		return
+	}
+
+	_ = h.store.UpdateNodeTraefik(id, true)
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok",
+		"output": output,
+	})
+}
+
 func (h *NodeHandler) Ping(w http.ResponseWriter, r *http.Request, id string) {
 	node, err := h.store.GetNode(id)
 	if err != nil {

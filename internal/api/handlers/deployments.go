@@ -92,7 +92,27 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cmd := sshexec.DockerRunCmd(containerName, app.DockerImage, ports, envVars, app.Command)
+	cfg := sshexec.RunConfig{
+		ContainerName: containerName,
+		Image:         app.DockerImage,
+		Ports:         ports,
+		EnvVars:       envVars,
+		Command:       app.Command,
+	}
+
+	if app.Domain != "" {
+		containerPort := "80"
+		if len(ports) > 0 {
+			// Parse "hostPort:containerPort" → take container side
+			if idx := strings.LastIndex(ports[0], ":"); idx >= 0 {
+				containerPort = ports[0][idx+1:]
+			}
+		}
+		cfg.Network = "traefik-net"
+		cfg.Labels = sshexec.TraefikLabels(containerName, app.Domain, containerPort)
+	}
+
+	cmd := sshexec.DockerRunCmd(cfg)
 	output, runErr := runner.Run(cmd)
 
 	if runErr != nil {

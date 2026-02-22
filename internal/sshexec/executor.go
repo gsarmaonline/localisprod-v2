@@ -99,30 +99,78 @@ func DockerLoginCmd(username, token string) string {
 		shellEscape(token), shellEscape(username))
 }
 
-func DockerRunCmd(containerName, image string, ports []string, envVars map[string]string, command string) string {
+// RunConfig holds parameters for docker run.
+type RunConfig struct {
+	ContainerName string
+	Image         string
+	Ports         []string
+	EnvVars       map[string]string
+	Command       string
+	Network       string            // "" = no --network flag
+	Labels        map[string]string // arbitrary docker labels
+}
+
+func DockerRunCmd(cfg RunConfig) string {
 	var sb strings.Builder
 	sb.WriteString("docker run -d --name ")
-	sb.WriteString(shellEscape(containerName))
+	sb.WriteString(shellEscape(cfg.ContainerName))
 
-	for _, p := range ports {
+	for _, p := range cfg.Ports {
 		sb.WriteString(" -p ")
 		sb.WriteString(shellEscape(p))
 	}
 
-	for k, v := range envVars {
+	for k, v := range cfg.EnvVars {
 		sb.WriteString(" -e ")
 		sb.WriteString(shellEscape(k + "=" + v))
 	}
 
-	sb.WriteString(" ")
-	sb.WriteString(shellEscape(image))
+	if cfg.Network != "" {
+		sb.WriteString(" --network ")
+		sb.WriteString(shellEscape(cfg.Network))
+	}
 
-	if command != "" {
+	for k, v := range cfg.Labels {
+		sb.WriteString(" --label ")
+		sb.WriteString(shellEscape(k + "=" + v))
+	}
+
+	sb.WriteString(" ")
+	sb.WriteString(shellEscape(cfg.Image))
+
+	if cfg.Command != "" {
 		sb.WriteString(" ")
-		sb.WriteString(command)
+		sb.WriteString(cfg.Command)
 	}
 
 	return sb.String()
+}
+
+// TraefikSetupCmd returns a shell command that installs Traefik on a node.
+func TraefikSetupCmd() string {
+	return strings.Join([]string{
+		"docker network create traefik-net 2>/dev/null || true",
+		"docker stop traefik 2>/dev/null || true && docker rm traefik 2>/dev/null || true",
+		"docker run -d --name traefik --restart unless-stopped" +
+			" -p 80:80" +
+			" -v /var/run/docker.sock:/var/run/docker.sock:ro" +
+			" --network traefik-net" +
+			" traefik:v3" +
+			" --providers.docker=true" +
+			" --providers.docker.exposedbydefault=false" +
+			" --providers.docker.network=traefik-net" +
+			" --entrypoints.web.address=:80",
+	}, " && ")
+}
+
+// TraefikLabels returns the docker labels needed for Traefik to route to a container.
+func TraefikLabels(routerName, domain, containerPort string) map[string]string {
+	return map[string]string{
+		"traefik.enable": "true",
+		fmt.Sprintf("traefik.http.routers.%s.rule", routerName):                      fmt.Sprintf("Host(`%s`)", domain),
+		fmt.Sprintf("traefik.http.routers.%s.entrypoints", routerName):               "web",
+		fmt.Sprintf("traefik.http.services.%s.loadbalancer.server.port", routerName): containerPort,
+	}
 }
 
 func DockerStopRemoveCmd(containerName string) string {

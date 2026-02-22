@@ -7,6 +7,7 @@ export default function Nodes() {
   const [nodeList, setNodeList] = useState<Node[]>([])
   const [showAdd, setShowAdd] = useState(false)
   const [pingResults, setPingResults] = useState<Record<string, string>>({})
+  const [traefikResults, setTraefikResults] = useState<Record<string, { status: string; output: string }>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,6 +51,16 @@ export default function Nodes() {
       await load()
     } catch (e: unknown) {
       setPingResults(prev => ({ ...prev, [id]: (e as Error).message }))
+    }
+  }
+
+  const handleSetupTraefik = async (id: string) => {
+    try {
+      const result = await nodes.setupTraefik(id)
+      setTraefikResults(prev => ({ ...prev, [id]: result }))
+      await load()
+    } catch (e: unknown) {
+      setTraefikResults(prev => ({ ...prev, [id]: { status: 'error', output: (e as Error).message } }))
     }
   }
 
@@ -98,23 +109,39 @@ export default function Nodes() {
                 <td className="px-4 py-3 text-gray-600">{n.username}</td>
                 <td className="px-4 py-3">
                   <StatusBadge status={n.status} />
+                  {n.traefik_enabled && (
+                    <span className="ml-2 px-1.5 py-0.5 text-xs bg-green-100 text-green-700 rounded font-medium">Traefik</span>
+                  )}
                   {pingResults[n.id] && (
                     <span className="ml-2 text-xs text-gray-500">({pingResults[n.id]})</span>
                   )}
                 </td>
-                <td className="px-4 py-3 flex gap-2">
-                  <button
-                    onClick={() => handlePing(n.id)}
-                    className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
-                  >
-                    Ping
-                  </button>
-                  <button
-                    onClick={() => handleDelete(n.id)}
-                    className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100"
-                  >
-                    Delete
-                  </button>
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handlePing(n.id)}
+                      className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                    >
+                      Ping
+                    </button>
+                    <button
+                      onClick={() => handleSetupTraefik(n.id)}
+                      className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100"
+                    >
+                      Setup Traefik
+                    </button>
+                    <button
+                      onClick={() => handleDelete(n.id)}
+                      className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  {traefikResults[n.id] && (
+                    <pre className={`mt-1 text-xs p-2 rounded max-w-xs overflow-auto whitespace-pre-wrap ${traefikResults[n.id].status === 'ok' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                      {traefikResults[n.id].output}
+                    </pre>
+                  )}
                 </td>
               </tr>
             ))}

@@ -3,15 +3,16 @@ package models
 import "time"
 
 type Node struct {
-	ID         string    `json:"id"`
-	Name       string    `json:"name"`
-	Host       string    `json:"host"`
-	Port       int       `json:"port"`
-	Username   string    `json:"username"`
-	PrivateKey string    `json:"private_key,omitempty"`
-	Status     string    `json:"status"`
-	IsLocal    bool      `json:"is_local"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Host           string    `json:"host"`
+	Port           int       `json:"port"`
+	Username       string    `json:"username"`
+	PrivateKey     string    `json:"private_key,omitempty"`
+	Status         string    `json:"status"`
+	IsLocal        bool      `json:"is_local"`
+	TraefikEnabled bool      `json:"traefik_enabled"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Application struct {
@@ -22,6 +23,7 @@ type Application struct {
 	Ports       string    `json:"ports"`    // JSON ["8080:80"]
 	Command     string    `json:"command"`
 	GithubRepo  string    `json:"github_repo"`
+	Domain      string    `json:"domain"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 

@@ -16,16 +16,17 @@ export default function Applications() {
     docker_image: string
     command: string
     github_repo: string
+    domain: string
     envPairs: { key: string; value: string }[]
     ports: string[]
   }>({
-    name: '', docker_image: '', command: '', github_repo: '',
+    name: '', docker_image: '', command: '', github_repo: '', domain: '',
     envPairs: [{ key: '', value: '' }],
     ports: [''],
   })
 
   const resetForm = () =>
-    setForm({ name: '', docker_image: '', command: '', github_repo: '', envPairs: [{ key: '', value: '' }], ports: [''] })
+    setForm({ name: '', docker_image: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''] })
 
   const load = () =>
     applications.list().then(setAppList).catch(e => setError(e.message))
@@ -46,6 +47,7 @@ export default function Applications() {
         env_vars: envVars,
         ports: form.ports.filter(Boolean),
         github_repo: form.github_repo || undefined,
+        domain: form.domain || undefined,
       }
       await applications.create(data)
       setShowCreate(false)
@@ -100,6 +102,7 @@ export default function Applications() {
       docker_image: `ghcr.io/${repo.full_name}:latest`,
       command: '',
       github_repo: repo.full_name,
+      domain: '',
       envPairs: [{ key: '', value: '' }],
       ports: [''],
     })
@@ -147,6 +150,7 @@ export default function Applications() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Image</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Ports</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Domain</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Command</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
@@ -154,7 +158,7 @@ export default function Applications() {
           <tbody className="divide-y">
             {appList.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">No applications yet</td>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No applications yet</td>
               </tr>
             )}
             {appList.map(a => (
@@ -179,6 +183,7 @@ export default function Applications() {
                 <td className="px-4 py-3 text-gray-600">
                   {parsePorts(a.ports).join(', ') || '—'}
                 </td>
+                <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.domain || '—'}</td>
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.command || '—'}</td>
                 <td className="px-4 py-3">
                   <button
@@ -267,6 +272,15 @@ export default function Applications() {
                 className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
                 value={form.command}
                 onChange={e => setForm(prev => ({ ...prev, command: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Domain (optional)</label>
+              <input
+                className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+                value={form.domain}
+                onChange={e => setForm(prev => ({ ...prev, domain: e.target.value }))}
+                placeholder="app.example.com"
               />
             </div>
 

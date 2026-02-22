@@ -21,6 +21,7 @@ export interface Node {
   port: number
   username: string
   status: string
+  traefik_enabled: boolean
   created_at: string
 }
 
@@ -41,6 +42,8 @@ export const nodes = {
     request<void>(`/nodes/${id}`, { method: 'DELETE' }),
   ping: (id: string) =>
     request<{ status: string; message: string }>(`/nodes/${id}/ping`, { method: 'POST' }),
+  setupTraefik: (id: string) =>
+    request<{ status: string; output: string }>(`/nodes/${id}/setup-traefik`, { method: 'POST' }),
 }
 
 // Applications
@@ -52,6 +55,7 @@ export interface Application {
   ports: string     // JSON string
   command: string
   github_repo: string
+  domain: string
   created_at: string
 }
 
@@ -62,6 +66,7 @@ export interface CreateApplicationInput {
   ports: string[]
   command: string
   github_repo?: string
+  domain?: string
 }
 
 export const applications = {

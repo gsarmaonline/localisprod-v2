@@ -62,13 +62,23 @@ func NewRouter(s *store.Store) http.Handler {
 			return
 		}
 
-		if len(parts) == 2 && parts[1] == "ping" {
-			if r.Method == http.MethodPost {
-				nodeH.Ping(w, r, id)
-			} else {
-				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		if len(parts) == 2 {
+			switch parts[1] {
+			case "ping":
+				if r.Method == http.MethodPost {
+					nodeH.Ping(w, r, id)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			case "setup-traefik":
+				if r.Method == http.MethodPost {
+					nodeH.SetupTraefik(w, r, id)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
 			}
-			return
 		}
 
 		switch r.Method {

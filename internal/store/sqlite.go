@@ -27,9 +27,11 @@ func New(path string) (*Store, error) {
 }
 
 func (s *Store) migrate() error {
-	// Idempotent: add is_local column to existing tables (ignored if already present)
+	// Idempotent: add columns to existing tables (ignored if already present)
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN is_local INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN traefik_enabled INTEGER NOT NULL DEFAULT 0`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN domain TEXT NOT NULL DEFAULT ''`)
 
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS nodes (
@@ -76,15 +78,15 @@ CREATE TABLE IF NOT EXISTS settings (
 
 func (s *Store) CreateNode(n *models.Node) error {
 	_, err := s.db.Exec(
-		`INSERT INTO nodes (id, name, host, port, username, private_key, status, is_local, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.IsLocal, n.CreatedAt,
+		`INSERT INTO nodes (id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.IsLocal, n.TraefikEnabled, n.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListNodes() ([]*models.Node, error) {
-	rows, err := s.db.Query(`SELECT id, name, host, port, username, private_key, status, is_local, created_at FROM nodes ORDER BY is_local DESC, created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at FROM nodes ORDER BY is_local DESC, created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +94,7 @@ func (s *Store) ListNodes() ([]*models.Node, error) {
 	var nodes []*models.Node
 	for rows.Next() {
 		n := &models.Node{}
-		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, n)
@@ -103,8 +105,8 @@ func (s *Store) ListNodes() ([]*models.Node, error) {
 func (s *Store) GetNode(id string) (*models.Node, error) {
 	n := &models.Node{}
 	err := s.db.QueryRow(
-		`SELECT id, name, host, port, username, private_key, status, is_local, created_at FROM nodes WHERE id = ?`, id,
-	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.CreatedAt)
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at FROM nodes WHERE id = ?`, id,
+	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -113,6 +115,15 @@ func (s *Store) GetNode(id string) (*models.Node, error) {
 
 func (s *Store) UpdateNodeStatus(id, status string) error {
 	_, err := s.db.Exec(`UPDATE nodes SET status = ? WHERE id = ?`, status, id)
+	return err
+}
+
+func (s *Store) UpdateNodeTraefik(id string, enabled bool) error {
+	val := 0
+	if enabled {
+		val = 1
+	}
+	_, err := s.db.Exec(`UPDATE nodes SET traefik_enabled = ? WHERE id = ?`, val, id)
 	return err
 }
 
@@ -125,15 +136,15 @@ func (s *Store) DeleteNode(id string) error {
 
 func (s *Store) CreateApplication(a *models.Application) error {
 	_, err := s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, a.EnvVars, a.Ports, a.Command, a.GithubRepo, a.CreatedAt,
+		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.DockerImage, a.EnvVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListApplications() ([]*models.Application, error) {
-	rows, err := s.db.Query(`SELECT id, name, docker_image, env_vars, ports, command, github_repo, created_at FROM applications ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at FROM applications ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +152,7 @@ func (s *Store) ListApplications() ([]*models.Application, error) {
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		apps = append(apps, a)
@@ -152,8 +163,8 @@ func (s *Store) ListApplications() ([]*models.Application, error) {
 func (s *Store) GetApplication(id string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, created_at FROM applications WHERE id = ?`, id,
-	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.CreatedAt)
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at FROM applications WHERE id = ?`, id,
+	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
