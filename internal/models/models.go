@@ -10,6 +10,7 @@ type Node struct {
 	Username   string    `json:"username"`
 	PrivateKey string    `json:"private_key,omitempty"`
 	Status     string    `json:"status"`
+	IsLocal    bool      `json:"is_local"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 

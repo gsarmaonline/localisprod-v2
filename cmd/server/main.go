@@ -26,6 +26,10 @@ func main() {
 		log.Fatalf("failed to open store: %v", err)
 	}
 
+	if err := s.EnsureLocalNode(); err != nil {
+		log.Fatalf("failed to ensure local node: %v", err)
+	}
+
 	router := api.NewRouter(s)
 
 	mux := http.NewServeMux()

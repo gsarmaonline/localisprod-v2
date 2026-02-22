@@ -113,8 +113,8 @@ func (h *NodeHandler) Ping(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	client := sshexec.New(node.Host, node.Port, node.Username, node.PrivateKey)
-	pingErr := client.Ping()
+	runner := sshexec.NewRunner(node)
+	pingErr := runner.Ping()
 
 	status := "online"
 	message := "pong"

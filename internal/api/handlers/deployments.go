@@ -71,8 +71,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal([]byte(app.Ports), &ports)
 
 	cmd := sshexec.DockerRunCmd(containerName, app.DockerImage, ports, envVars, app.Command)
-	client := sshexec.New(node.Host, node.Port, node.Username, node.PrivateKey)
-	output, runErr := client.Run(cmd)
+	output, runErr := sshexec.NewRunner(node).Run(cmd)
 
 	if runErr != nil {
 		_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")
@@ -131,9 +130,8 @@ func (h *DeploymentHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 
 	node, err := h.store.GetNode(d.NodeID)
 	if err == nil && node != nil {
-		client := sshexec.New(node.Host, node.Port, node.Username, node.PrivateKey)
 		cmd := sshexec.DockerStopRemoveCmd(d.ContainerName)
-		_, _ = client.Run(cmd)
+		_, _ = sshexec.NewRunner(node).Run(cmd)
 	}
 
 	if err := h.store.DeleteDeployment(id); err != nil {
@@ -156,9 +154,8 @@ func (h *DeploymentHandler) Restart(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 
-	client := sshexec.New(node.Host, node.Port, node.Username, node.PrivateKey)
 	cmd := sshexec.DockerRestartCmd(d.ContainerName)
-	output, runErr := client.Run(cmd)
+	output, runErr := sshexec.NewRunner(node).Run(cmd)
 
 	if runErr != nil {
 		writeJSON(w, http.StatusOK, map[string]string{
@@ -189,9 +186,8 @@ func (h *DeploymentHandler) Logs(w http.ResponseWriter, r *http.Request, id stri
 		return
 	}
 
-	client := sshexec.New(node.Host, node.Port, node.Username, node.PrivateKey)
 	cmd := sshexec.DockerLogsCmd(d.ContainerName)
-	output, runErr := client.Run(cmd)
+	output, runErr := sshexec.NewRunner(node).Run(cmd)
 
 	if runErr != nil {
 		writeJSON(w, http.StatusOK, map[string]string{

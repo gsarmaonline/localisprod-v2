@@ -27,6 +27,9 @@ func New(path string) (*Store, error) {
 }
 
 func (s *Store) migrate() error {
+	// Idempotent: add is_local column to existing tables (ignored if already present)
+	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN is_local INTEGER NOT NULL DEFAULT 0`)
+
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,
@@ -36,6 +39,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   username TEXT NOT NULL,
   private_key TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'unknown',
+  is_local INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -66,15 +70,15 @@ CREATE TABLE IF NOT EXISTS deployments (
 
 func (s *Store) CreateNode(n *models.Node) error {
 	_, err := s.db.Exec(
-		`INSERT INTO nodes (id, name, host, port, username, private_key, status, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.CreatedAt,
+		`INSERT INTO nodes (id, name, host, port, username, private_key, status, is_local, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.IsLocal, n.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListNodes() ([]*models.Node, error) {
-	rows, err := s.db.Query(`SELECT id, name, host, port, username, private_key, status, created_at FROM nodes ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, host, port, username, private_key, status, is_local, created_at FROM nodes ORDER BY is_local DESC, created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +86,7 @@ func (s *Store) ListNodes() ([]*models.Node, error) {
 	var nodes []*models.Node
 	for rows.Next() {
 		n := &models.Node{}
-		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.CreatedAt); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, n)
@@ -93,8 +97,8 @@ func (s *Store) ListNodes() ([]*models.Node, error) {
 func (s *Store) GetNode(id string) (*models.Node, error) {
 	n := &models.Node{}
 	err := s.db.QueryRow(
-		`SELECT id, name, host, port, username, private_key, status, created_at FROM nodes WHERE id = ?`, id,
-	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.CreatedAt)
+		`SELECT id, name, host, port, username, private_key, status, is_local, created_at FROM nodes WHERE id = ?`, id,
+	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -246,5 +250,24 @@ func (s *Store) CountApplications() (int, error) {
 	return count, err
 }
 
-// ensure time.Time is imported
-var _ = time.Now
+// EnsureLocalNode creates the localhost node if it doesn't already exist.
+func (s *Store) EnsureLocalNode() error {
+	var count int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM nodes WHERE is_local = 1`).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	node := &models.Node{
+		ID:        "local",
+		Name:      "localhost",
+		Host:      "127.0.0.1",
+		Port:      0,
+		Username:  "",
+		IsLocal:   true,
+		Status:    "online",
+		CreatedAt: time.Now().UTC(),
+	}
+	return s.CreateNode(node)
+}
