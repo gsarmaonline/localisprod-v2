@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gsarma/localisprod-v2/internal/models"
 	"github.com/gsarma/localisprod-v2/internal/secret"
 	_ "modernc.org/sqlite"
@@ -48,8 +49,28 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN traefik_enabled INTEGER NOT NULL DEFAULT 0`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN domain TEXT NOT NULL DEFAULT ''`)
+	// Multi-tenancy: add user_id to resource tables (idempotent, errors ignored)
+	_, _ = s.db.Exec(`ALTER TABLE nodes        ADD COLUMN user_id TEXT REFERENCES users(id)`)
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN user_id TEXT REFERENCES users(id)`)
+	_, _ = s.db.Exec(`ALTER TABLE deployments  ADD COLUMN user_id TEXT REFERENCES users(id)`)
 
 	_, err := s.db.Exec(`
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  google_id TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
+  avatar_url TEXT NOT NULL DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id TEXT NOT NULL REFERENCES users(id),
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  PRIMARY KEY (user_id, key)
+);
+
 CREATE TABLE IF NOT EXISTS nodes (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -60,20 +81,24 @@ CREATE TABLE IF NOT EXISTS nodes (
   status TEXT NOT NULL DEFAULT 'unknown',
   is_local INTEGER NOT NULL DEFAULT 0,
   traefik_enabled INTEGER NOT NULL DEFAULT 0,
+  user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS applications (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
   docker_image TEXT NOT NULL,
   env_vars TEXT NOT NULL DEFAULT '{}',
   ports TEXT NOT NULL DEFAULT '[]',
   command TEXT NOT NULL DEFAULT '',
   github_repo TEXT NOT NULL DEFAULT '',
   domain TEXT NOT NULL DEFAULT '',
+  user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_applications_user_name ON applications(user_id, name);
 
 CREATE TABLE IF NOT EXISTS deployments (
   id TEXT PRIMARY KEY,
@@ -82,6 +107,7 @@ CREATE TABLE IF NOT EXISTS deployments (
   container_name TEXT NOT NULL,
   container_id TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
+  user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -93,19 +119,104 @@ CREATE TABLE IF NOT EXISTS settings (
 	return err
 }
 
-// Nodes
+// Users
 
-func (s *Store) CreateNode(n *models.Node) error {
+func (s *Store) UpsertUser(googleID, email, name, avatarURL string) (*models.User, error) {
+	// Try insert first; on conflict update name/email/avatar
+	id := uuid.New().String()
+	_, err := s.db.Exec(`
+		INSERT INTO users (id, google_id, email, name, avatar_url)
+		VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(google_id) DO UPDATE SET
+			email      = excluded.email,
+			name       = excluded.name,
+			avatar_url = excluded.avatar_url
+	`, id, googleID, email, name, avatarURL)
+	if err != nil {
+		return nil, fmt.Errorf("upsert user: %w", err)
+	}
+
+	// Fetch the actual stored row (id may differ if conflict)
+	u := &models.User{}
+	err = s.db.QueryRow(
+		`SELECT id, google_id, email, name, avatar_url, created_at FROM users WHERE google_id = ?`, googleID,
+	).Scan(&u.ID, &u.GoogleID, &u.Email, &u.Name, &u.AvatarURL, &u.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("fetch upserted user: %w", err)
+	}
+
+	// Ensure a webhook_token exists for new users
+	tok, _ := s.GetUserSetting(u.ID, "webhook_token")
+	if tok == "" {
+		newTok := uuid.New().String()
+		_ = s.SetUserSetting(u.ID, "webhook_token", newTok)
+	}
+
+	return u, nil
+}
+
+func (s *Store) GetUserByID(id string) (*models.User, error) {
+	u := &models.User{}
+	err := s.db.QueryRow(
+		`SELECT id, google_id, email, name, avatar_url, created_at FROM users WHERE id = ?`, id,
+	).Scan(&u.ID, &u.GoogleID, &u.Email, &u.Name, &u.AvatarURL, &u.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return u, err
+}
+
+func (s *Store) GetUserByWebhookToken(token string) (*models.User, error) {
+	var userID string
+	err := s.db.QueryRow(
+		`SELECT user_id FROM user_settings WHERE key = 'webhook_token' AND value = ?`, token,
+	).Scan(&userID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.GetUserByID(userID)
+}
+
+// User settings
+
+func (s *Store) GetUserSetting(userID, key string) (string, error) {
+	var value string
+	err := s.db.QueryRow(
+		`SELECT value FROM user_settings WHERE user_id = ? AND key = ?`, userID, key,
+	).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return value, err
+}
+
+func (s *Store) SetUserSetting(userID, key, value string) error {
 	_, err := s.db.Exec(
-		`INSERT INTO nodes (id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.IsLocal, n.TraefikEnabled, n.CreatedAt,
+		`INSERT INTO user_settings (user_id, key, value) VALUES (?, ?, ?)
+		 ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value`,
+		userID, key, value,
 	)
 	return err
 }
 
-func (s *Store) ListNodes() ([]*models.Node, error) {
-	rows, err := s.db.Query(`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at FROM nodes ORDER BY is_local DESC, created_at DESC`)
+// Nodes
+
+func (s *Store) CreateNode(n *models.Node, userID string) error {
+	_, err := s.db.Exec(
+		`INSERT INTO nodes (id, name, host, port, username, private_key, status, is_local, traefik_enabled, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.IsLocal, n.TraefikEnabled, userID, n.CreatedAt,
+	)
+	return err
+}
+
+func (s *Store) ListNodes(userID string) ([]*models.Node, error) {
+	rows, err := s.db.Query(
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		 FROM nodes WHERE user_id = ? ORDER BY is_local DESC, created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -121,10 +232,11 @@ func (s *Store) ListNodes() ([]*models.Node, error) {
 	return nodes, rows.Err()
 }
 
-func (s *Store) GetNode(id string) (*models.Node, error) {
+func (s *Store) GetNode(id, userID string) (*models.Node, error) {
 	n := &models.Node{}
 	err := s.db.QueryRow(
-		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at FROM nodes WHERE id = ?`, id,
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		 FROM nodes WHERE id = ? AND user_id = ?`, id, userID,
 	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -132,42 +244,44 @@ func (s *Store) GetNode(id string) (*models.Node, error) {
 	return n, err
 }
 
-func (s *Store) UpdateNodeStatus(id, status string) error {
-	_, err := s.db.Exec(`UPDATE nodes SET status = ? WHERE id = ?`, status, id)
+func (s *Store) UpdateNodeStatus(id, userID, status string) error {
+	_, err := s.db.Exec(`UPDATE nodes SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
 	return err
 }
 
-func (s *Store) UpdateNodeTraefik(id string, enabled bool) error {
+func (s *Store) UpdateNodeTraefik(id, userID string, enabled bool) error {
 	val := 0
 	if enabled {
 		val = 1
 	}
-	_, err := s.db.Exec(`UPDATE nodes SET traefik_enabled = ? WHERE id = ?`, val, id)
+	_, err := s.db.Exec(`UPDATE nodes SET traefik_enabled = ? WHERE id = ? AND user_id = ?`, val, id, userID)
 	return err
 }
 
-func (s *Store) DeleteNode(id string) error {
-	_, err := s.db.Exec(`DELETE FROM nodes WHERE id = ?`, id)
+func (s *Store) DeleteNode(id, userID string) error {
+	_, err := s.db.Exec(`DELETE FROM nodes WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 
 // Applications
 
-func (s *Store) CreateApplication(a *models.Application) error {
+func (s *Store) CreateApplication(a *models.Application, userID string) error {
 	envVars, err := s.encryptEnvVars(a.EnvVars)
 	if err != nil {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.CreatedAt,
+		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, domain, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, userID, a.CreatedAt,
 	)
 	return err
 }
 
-func (s *Store) ListApplications() ([]*models.Application, error) {
-	rows, err := s.db.Query(`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at FROM applications ORDER BY created_at DESC`)
+func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
+	rows, err := s.db.Query(
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at
+		 FROM applications WHERE user_id = ? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,10 +300,11 @@ func (s *Store) ListApplications() ([]*models.Application, error) {
 	return apps, rows.Err()
 }
 
-func (s *Store) GetApplication(id string) (*models.Application, error) {
+func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at FROM applications WHERE id = ?`, id,
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at
+		 FROM applications WHERE id = ? AND user_id = ?`, id, userID,
 	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -203,31 +318,54 @@ func (s *Store) GetApplication(id string) (*models.Application, error) {
 	return a, nil
 }
 
-func (s *Store) DeleteApplication(id string) error {
-	_, err := s.db.Exec(`DELETE FROM applications WHERE id = ?`, id)
+func (s *Store) DeleteApplication(id, userID string) error {
+	_, err := s.db.Exec(`DELETE FROM applications WHERE id = ? AND user_id = ?`, id, userID)
 	return err
+}
+
+func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*models.Application, error) {
+	rows, err := s.db.Query(
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at
+		 FROM applications WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var apps []*models.Application
+	for rows.Next() {
+		a := &models.Application{}
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
+			return nil, fmt.Errorf("decrypt env_vars for %s: %w", a.ID, err)
+		}
+		apps = append(apps, a)
+	}
+	return apps, rows.Err()
 }
 
 // Deployments
 
-func (s *Store) CreateDeployment(d *models.Deployment) error {
+func (s *Store) CreateDeployment(d *models.Deployment, userID string) error {
 	_, err := s.db.Exec(
-		`INSERT INTO deployments (id, application_id, node_id, container_name, container_id, status, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.ApplicationID, d.NodeID, d.ContainerName, d.ContainerID, d.Status, d.CreatedAt,
+		`INSERT INTO deployments (id, application_id, node_id, container_name, container_id, status, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.ApplicationID, d.NodeID, d.ContainerName, d.ContainerID, d.Status, userID, d.CreatedAt,
 	)
 	return err
 }
 
-func (s *Store) ListDeployments() ([]*models.Deployment, error) {
+func (s *Store) ListDeployments(userID string) ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
 		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
 		JOIN applications a ON d.application_id = a.id
 		JOIN nodes n ON d.node_id = n.id
+		WHERE d.user_id = ?
 		ORDER BY d.created_at DESC
-	`)
+	`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +381,7 @@ func (s *Store) ListDeployments() ([]*models.Deployment, error) {
 	return deployments, rows.Err()
 }
 
-func (s *Store) GetDeployment(id string) (*models.Deployment, error) {
+func (s *Store) GetDeployment(id, userID string) (*models.Deployment, error) {
 	d := &models.Deployment{}
 	err := s.db.QueryRow(`
 		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
@@ -251,24 +389,24 @@ func (s *Store) GetDeployment(id string) (*models.Deployment, error) {
 		FROM deployments d
 		JOIN applications a ON d.application_id = a.id
 		JOIN nodes n ON d.node_id = n.id
-		WHERE d.id = ?
-	`, id).Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage)
+		WHERE d.id = ? AND d.user_id = ?
+	`, id, userID).Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return d, err
 }
 
-func (s *Store) GetDeploymentsByApplicationID(appID string) ([]*models.Deployment, error) {
+func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
 		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
 		JOIN applications a ON d.application_id = a.id
 		JOIN nodes n ON d.node_id = n.id
-		WHERE d.application_id = ?
+		WHERE d.application_id = ? AND d.user_id = ?
 		ORDER BY d.created_at DESC
-	`, appID)
+	`, appID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,18 +422,18 @@ func (s *Store) GetDeploymentsByApplicationID(appID string) ([]*models.Deploymen
 	return deployments, rows.Err()
 }
 
-func (s *Store) UpdateDeploymentStatus(id, status, containerID string) error {
-	_, err := s.db.Exec(`UPDATE deployments SET status = ?, container_id = ? WHERE id = ?`, status, containerID, id)
+func (s *Store) UpdateDeploymentStatus(id, userID, status, containerID string) error {
+	_, err := s.db.Exec(`UPDATE deployments SET status = ?, container_id = ? WHERE id = ? AND user_id = ?`, status, containerID, id, userID)
 	return err
 }
 
-func (s *Store) DeleteDeployment(id string) error {
-	_, err := s.db.Exec(`DELETE FROM deployments WHERE id = ?`, id)
+func (s *Store) DeleteDeployment(id, userID string) error {
+	_, err := s.db.Exec(`DELETE FROM deployments WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 
-func (s *Store) CountDeploymentsByStatus() (map[string]int, error) {
-	rows, err := s.db.Query(`SELECT status, COUNT(*) FROM deployments GROUP BY status`)
+func (s *Store) CountDeploymentsByStatus(userID string) (map[string]int, error) {
+	rows, err := s.db.Query(`SELECT status, COUNT(*) FROM deployments WHERE user_id = ? GROUP BY status`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -312,19 +450,19 @@ func (s *Store) CountDeploymentsByStatus() (map[string]int, error) {
 	return counts, rows.Err()
 }
 
-func (s *Store) CountNodes() (int, error) {
+func (s *Store) CountNodes(userID string) (int, error) {
 	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM nodes`).Scan(&count)
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM nodes WHERE user_id = ?`, userID).Scan(&count)
 	return count, err
 }
 
-func (s *Store) CountApplications() (int, error) {
+func (s *Store) CountApplications(userID string) (int, error) {
 	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM applications`).Scan(&count)
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM applications WHERE user_id = ?`, userID).Scan(&count)
 	return count, err
 }
 
-// Settings
+// Settings (global, kept for legacy; prefer user settings)
 
 func (s *Store) GetSetting(key string) (string, error) {
 	var value string
@@ -343,7 +481,7 @@ func (s *Store) SetSetting(key, value string) error {
 	return err
 }
 
-// EnsureLocalNode creates the localhost node if it doesn't already exist.
+// EnsureLocalNode is kept but unused with multi-tenancy.
 func (s *Store) EnsureLocalNode() error {
 	var count int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM nodes WHERE is_local = 1`).Scan(&count); err != nil {
@@ -362,5 +500,5 @@ func (s *Store) EnsureLocalNode() error {
 		Status:    "online",
 		CreatedAt: time.Now().UTC(),
 	}
-	return s.CreateNode(node)
+	return s.CreateNode(node, "")
 }

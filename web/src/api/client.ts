@@ -3,14 +3,32 @@ const BASE = '/api'
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     ...options,
   })
   if (!res.ok) {
+    if (res.status === 401 && path !== '/auth/me') {
+      window.location.href = '/login'
+      return undefined as T
+    }
     const body = await res.json().catch(() => ({ error: res.statusText }))
     throw new Error(body.error || res.statusText)
   }
   if (res.status === 204) return undefined as T
   return res.json()
+}
+
+// Auth
+export interface CurrentUser {
+  id: string
+  email: string
+  name: string
+  avatar_url: string
+}
+
+export const auth = {
+  me: () => request<CurrentUser>('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
 }
 
 // Nodes
@@ -96,6 +114,7 @@ export interface Settings {
   github_username: string
   github_token: string     // "configured" | ""
   webhook_secret: string   // "configured" | ""
+  webhook_url: string
 }
 
 export const settings = {

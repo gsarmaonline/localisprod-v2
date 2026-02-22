@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/gsarma/localisprod-v2/internal/api"
+	"github.com/gsarma/localisprod-v2/internal/auth"
 	"github.com/gsarma/localisprod-v2/internal/secret"
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
@@ -25,6 +26,16 @@ func main() {
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
 		dbPath = "cluster.db"
+	}
+
+	appURL := os.Getenv("APP_URL")
+	if appURL == "" {
+		appURL = fmt.Sprintf("http://localhost:%s", port)
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is required (generate with: openssl rand -base64 32)")
 	}
 
 	var cipher *secret.Cipher
@@ -47,11 +58,13 @@ func main() {
 		log.Fatalf("failed to open store: %v", err)
 	}
 
-	if err := s.EnsureLocalNode(); err != nil {
-		log.Fatalf("failed to ensure local node: %v", err)
-	}
+	jwtSvc := auth.NewJWTService(jwtSecret)
 
-	router := api.NewRouter(s)
+	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	googleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
+	oauthSvc := auth.NewOAuthService(googleClientID, googleClientSecret, appURL)
+
+	router := api.NewRouter(s, oauthSvc, jwtSvc, appURL)
 
 	mux := http.NewServeMux()
 

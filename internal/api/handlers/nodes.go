@@ -20,6 +20,10 @@ func NewNodeHandler(s *store.Store) *NodeHandler {
 }
 
 func (h *NodeHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
 	var body struct {
 		Name       string `json:"name"`
 		Host       string `json:"host"`
@@ -48,7 +52,7 @@ func (h *NodeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:     "unknown",
 		CreatedAt:  time.Now().UTC(),
 	}
-	if err := h.store.CreateNode(node); err != nil {
+	if err := h.store.CreateNode(node, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -57,7 +61,11 @@ func (h *NodeHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
-	nodes, err := h.store.ListNodes()
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	nodes, err := h.store.ListNodes(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -72,7 +80,11 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *NodeHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
-	node, err := h.store.GetNode(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	node, err := h.store.GetNode(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -86,7 +98,11 @@ func (h *NodeHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request, id string) {
-	node, err := h.store.GetNode(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	node, err := h.store.GetNode(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -95,7 +111,7 @@ func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request, id string) 
 		writeError(w, http.StatusNotFound, "node not found")
 		return
 	}
-	if err := h.store.DeleteNode(id); err != nil {
+	if err := h.store.DeleteNode(id, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -103,7 +119,11 @@ func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request, id string) 
 }
 
 func (h *NodeHandler) SetupTraefik(w http.ResponseWriter, r *http.Request, id string) {
-	node, err := h.store.GetNode(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	node, err := h.store.GetNode(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -124,7 +144,7 @@ func (h *NodeHandler) SetupTraefik(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 
-	_ = h.store.UpdateNodeTraefik(id, true)
+	_ = h.store.UpdateNodeTraefik(id, userID, true)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status": "ok",
 		"output": output,
@@ -132,7 +152,11 @@ func (h *NodeHandler) SetupTraefik(w http.ResponseWriter, r *http.Request, id st
 }
 
 func (h *NodeHandler) Ping(w http.ResponseWriter, r *http.Request, id string) {
-	node, err := h.store.GetNode(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	node, err := h.store.GetNode(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -152,7 +176,7 @@ func (h *NodeHandler) Ping(w http.ResponseWriter, r *http.Request, id string) {
 		message = pingErr.Error()
 	}
 
-	_ = h.store.UpdateNodeStatus(id, status)
+	_ = h.store.UpdateNodeStatus(id, userID, status)
 
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  status,

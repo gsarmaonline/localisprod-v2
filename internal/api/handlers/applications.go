@@ -19,6 +19,10 @@ func NewApplicationHandler(s *store.Store) *ApplicationHandler {
 }
 
 func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
 	var body struct {
 		Name        string            `json:"name"`
 		DockerImage string            `json:"docker_image"`
@@ -57,7 +61,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Domain:      body.Domain,
 		CreatedAt:   time.Now().UTC(),
 	}
-	if err := h.store.CreateApplication(app); err != nil {
+	if err := h.store.CreateApplication(app, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -65,7 +69,11 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
-	apps, err := h.store.ListApplications()
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	apps, err := h.store.ListApplications(userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -77,7 +85,11 @@ func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
-	app, err := h.store.GetApplication(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	app, err := h.store.GetApplication(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -90,7 +102,11 @@ func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request, id stri
 }
 
 func (h *ApplicationHandler) Delete(w http.ResponseWriter, r *http.Request, id string) {
-	app, err := h.store.GetApplication(id)
+	userID := getUserID(w, r)
+	if userID == "" {
+		return
+	}
+	app, err := h.store.GetApplication(id, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -99,7 +115,7 @@ func (h *ApplicationHandler) Delete(w http.ResponseWriter, r *http.Request, id s
 		writeError(w, http.StatusNotFound, "application not found")
 		return
 	}
-	if err := h.store.DeleteApplication(id); err != nil {
+	if err := h.store.DeleteApplication(id, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

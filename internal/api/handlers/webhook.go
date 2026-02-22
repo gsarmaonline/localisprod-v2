@@ -22,15 +22,26 @@ func NewWebhookHandler(s *store.Store) *WebhookHandler {
 	return &WebhookHandler{store: s}
 }
 
-func (h *WebhookHandler) Github(w http.ResponseWriter, r *http.Request) {
+func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, token string) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "failed to read body")
 		return
 	}
 
-	// Verify HMAC-SHA256 signature if webhook_secret is configured
-	secret, _ := h.store.GetSetting("webhook_secret")
+	// Look up the user by webhook token
+	user, err := h.store.GetUserByWebhookToken(token)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if user == nil {
+		writeError(w, http.StatusNotFound, "invalid webhook token")
+		return
+	}
+
+	// Verify HMAC-SHA256 signature against this user's webhook_secret
+	secret, _ := h.store.GetUserSetting(user.ID, "webhook_secret")
 	if secret != "" {
 		sig := r.Header.Get("X-Hub-Signature-256")
 		if !verifySignature(secret, sig, body) {
@@ -63,23 +74,19 @@ func (h *WebhookHandler) Github(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apps, err := h.store.ListApplications()
+	apps, err := h.store.ListApplicationsByUserAndRepo(user.ID, repoFullName)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	ghToken, _ := h.store.GetSetting("github_token")
-	ghUsername, _ := h.store.GetSetting("github_username")
+	ghToken, _ := h.store.GetUserSetting(user.ID, "github_token")
+	ghUsername, _ := h.store.GetUserSetting(user.ID, "github_username")
 
 	redeployed := 0
 
 	for _, app := range apps {
-		if app.GithubRepo != repoFullName {
-			continue
-		}
-
-		deployments, err := h.store.GetDeploymentsByApplicationID(app.ID)
+		deployments, err := h.store.GetDeploymentsByApplicationID(app.ID, user.ID)
 		if err != nil {
 			log.Printf("webhook: list deployments for app %s: %v", app.ID, err)
 			continue
@@ -95,7 +102,7 @@ func (h *WebhookHandler) Github(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			node, err := h.store.GetNode(d.NodeID)
+			node, err := h.store.GetNode(d.NodeID, user.ID)
 			if err != nil || node == nil {
 				log.Printf("webhook: node %s not found for deployment %s", d.NodeID, d.ID)
 				continue
@@ -108,7 +115,7 @@ func (h *WebhookHandler) Github(w http.ResponseWriter, r *http.Request) {
 				loginCmd := sshexec.DockerLoginCmd(ghUsername, ghToken)
 				if _, loginErr := runner.Run(loginCmd); loginErr != nil {
 					log.Printf("webhook: docker login failed for deployment %s: %v", d.ID, loginErr)
-					_ = h.store.UpdateDeploymentStatus(d.ID, "failed", "")
+					_ = h.store.UpdateDeploymentStatus(d.ID, user.ID, "failed", "")
 					continue
 				}
 			}
@@ -117,7 +124,7 @@ func (h *WebhookHandler) Github(w http.ResponseWriter, r *http.Request) {
 			pullCmd := sshexec.DockerPullCmd(app.DockerImage)
 			if _, pullErr := runner.Run(pullCmd); pullErr != nil {
 				log.Printf("webhook: docker pull failed for deployment %s: %v", d.ID, pullErr)
-				_ = h.store.UpdateDeploymentStatus(d.ID, "failed", "")
+				_ = h.store.UpdateDeploymentStatus(d.ID, user.ID, "failed", "")
 				continue
 			}
 
@@ -150,12 +157,12 @@ func (h *WebhookHandler) Github(w http.ResponseWriter, r *http.Request) {
 			output, runErr := runner.Run(runCmd)
 			if runErr != nil {
 				log.Printf("webhook: docker run failed for deployment %s: %v\noutput: %s", d.ID, runErr, output)
-				_ = h.store.UpdateDeploymentStatus(d.ID, "failed", "")
+				_ = h.store.UpdateDeploymentStatus(d.ID, user.ID, "failed", "")
 				continue
 			}
 
 			newContainerID := strings.TrimSpace(output)
-			_ = h.store.UpdateDeploymentStatus(d.ID, "running", newContainerID)
+			_ = h.store.UpdateDeploymentStatus(d.ID, user.ID, "running", newContainerID)
 			log.Printf("webhook: redeployed %s (container %s) on node %s", d.ContainerName, newContainerID, node.Name)
 			redeployed++
 		}

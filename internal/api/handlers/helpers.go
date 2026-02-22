@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/gsarma/localisprod-v2/internal/auth"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -13,4 +15,13 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func getUserID(w http.ResponseWriter, r *http.Request) string {
+	claims := auth.ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return ""
+	}
+	return claims.UserID
 }

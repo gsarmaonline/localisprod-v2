@@ -40,7 +40,7 @@ func TestNodeCreate_InvalidJSON(t *testing.T) {
 	h := handlers.NewNodeHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/nodes", nil)
+	r := withUserID(httptest.NewRequest(http.MethodPost, "/api/nodes", nil))
 	r.Header.Set("Content-Type", "application/json")
 	h.Create(rec, r)
 
@@ -205,7 +205,7 @@ func TestNodeDelete_NotFound(t *testing.T) {
 	h := handlers.NewNodeHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodDelete, "/api/nodes/nonexistent", nil)
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/nodes/nonexistent", nil))
 	h.Delete(rec, r, "nonexistent")
 
 	if rec.Code != http.StatusNotFound {
@@ -219,7 +219,7 @@ func TestNodeDelete_Success(t *testing.T) {
 	n := mustCreateNode(t, s)
 
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodDelete, "/api/nodes/"+n.ID, nil)
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/nodes/"+n.ID, nil))
 	h.Delete(rec, r, n.ID)
 
 	if rec.Code != http.StatusNoContent {
