@@ -29,6 +29,7 @@ func New(path string) (*Store, error) {
 func (s *Store) migrate() error {
 	// Idempotent: add is_local column to existing tables (ignored if already present)
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN is_local INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
 
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS nodes (
@@ -61,6 +62,11 @@ CREATE TABLE IF NOT EXISTS deployments (
   container_id TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 `)
 	return err
@@ -119,15 +125,15 @@ func (s *Store) DeleteNode(id string) error {
 
 func (s *Store) CreateApplication(a *models.Application) error {
 	_, err := s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, a.EnvVars, a.Ports, a.Command, a.CreatedAt,
+		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.DockerImage, a.EnvVars, a.Ports, a.Command, a.GithubRepo, a.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListApplications() ([]*models.Application, error) {
-	rows, err := s.db.Query(`SELECT id, name, docker_image, env_vars, ports, command, created_at FROM applications ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, name, docker_image, env_vars, ports, command, github_repo, created_at FROM applications ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +141,7 @@ func (s *Store) ListApplications() ([]*models.Application, error) {
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		apps = append(apps, a)
@@ -146,8 +152,8 @@ func (s *Store) ListApplications() ([]*models.Application, error) {
 func (s *Store) GetApplication(id string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, env_vars, ports, command, created_at FROM applications WHERE id = ?`, id,
-	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.CreatedAt)
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, created_at FROM applications WHERE id = ?`, id,
+	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -248,6 +254,25 @@ func (s *Store) CountApplications() (int, error) {
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM applications`).Scan(&count)
 	return count, err
+}
+
+// Settings
+
+func (s *Store) GetSetting(key string) (string, error) {
+	var value string
+	err := s.db.QueryRow(`SELECT value FROM settings WHERE key = ?`, key).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return value, err
+}
+
+func (s *Store) SetSetting(key, value string) error {
+	_, err := s.db.Exec(
+		`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+		key, value,
+	)
+	return err
 }
 
 // EnsureLocalNode creates the localhost node if it doesn't already exist.

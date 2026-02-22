@@ -3,12 +3,14 @@ import Dashboard from './pages/Dashboard'
 import Nodes from './pages/Nodes'
 import Applications from './pages/Applications'
 import Deployments from './pages/Deployments'
+import Settings from './pages/Settings'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: '▦' },
   { to: '/nodes', label: 'Nodes', icon: '⬡' },
   { to: '/applications', label: 'Applications', icon: '⬜' },
   { to: '/deployments', label: 'Deployments', icon: '⚡' },
+  { to: '/settings', label: 'Settings', icon: '⚙' },
 ]
 
 export default function App() {
@@ -49,6 +51,7 @@ export default function App() {
             <Route path="/nodes" element={<Nodes />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/deployments" element={<Deployments />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>

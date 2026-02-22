@@ -94,6 +94,11 @@ func (c *Client) Ping() error {
 	return err
 }
 
+func DockerLoginCmd(username, token string) string {
+	return fmt.Sprintf("echo %s | docker login ghcr.io -u %s --password-stdin",
+		shellEscape(token), shellEscape(username))
+}
+
 func DockerRunCmd(containerName, image string, ports []string, envVars map[string]string, command string) string {
 	var sb strings.Builder
 	sb.WriteString("docker run -d --name ")

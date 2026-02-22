@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
-import { applications, Application, CreateApplicationInput } from '../api/client'
+import { applications, github, settings, Application, CreateApplicationInput, GithubRepo } from '../api/client'
 import Modal from '../components/Modal'
 
 export default function Applications() {
   const [appList, setAppList] = useState<Application[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const [showRepoPicker, setShowRepoPicker] = useState(false)
+  const [repos, setRepos] = useState<GithubRepo[]>([])
+  const [reposLoading, setReposLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -12,13 +15,17 @@ export default function Applications() {
     name: string
     docker_image: string
     command: string
+    github_repo: string
     envPairs: { key: string; value: string }[]
     ports: string[]
   }>({
-    name: '', docker_image: '', command: '',
+    name: '', docker_image: '', command: '', github_repo: '',
     envPairs: [{ key: '', value: '' }],
     ports: [''],
   })
+
+  const resetForm = () =>
+    setForm({ name: '', docker_image: '', command: '', github_repo: '', envPairs: [{ key: '', value: '' }], ports: [''] })
 
   const load = () =>
     applications.list().then(setAppList).catch(e => setError(e.message))
@@ -38,10 +45,11 @@ export default function Applications() {
         command: form.command,
         env_vars: envVars,
         ports: form.ports.filter(Boolean),
+        github_repo: form.github_repo || undefined,
       }
       await applications.create(data)
       setShowCreate(false)
-      setForm({ name: '', docker_image: '', command: '', envPairs: [{ key: '', value: '' }], ports: [''] })
+      resetForm()
       await load()
     } catch (e: unknown) {
       setError((e as Error).message)
@@ -60,6 +68,44 @@ export default function Applications() {
     }
   }
 
+  const handleFromGithub = async () => {
+    setError(null)
+    try {
+      const s = await settings.get()
+      if (s.github_token !== 'configured') {
+        setError('GitHub token not configured. Go to Settings to add your PAT.')
+        return
+      }
+    } catch {
+      setError('Could not check settings.')
+      return
+    }
+    setShowRepoPicker(true)
+    setReposLoading(true)
+    try {
+      const list = await github.listRepos()
+      setRepos(list)
+    } catch (e: unknown) {
+      setError((e as Error).message)
+      setShowRepoPicker(false)
+    } finally {
+      setReposLoading(false)
+    }
+  }
+
+  const handleSelectRepo = (repo: GithubRepo) => {
+    setShowRepoPicker(false)
+    setForm({
+      name: repo.name,
+      docker_image: `ghcr.io/${repo.full_name}:latest`,
+      command: '',
+      github_repo: repo.full_name,
+      envPairs: [{ key: '', value: '' }],
+      ports: [''],
+    })
+    setShowCreate(true)
+  }
+
   const parsePorts = (s: string) => {
     try { return JSON.parse(s) as string[] } catch { return [] }
   }
@@ -68,12 +114,23 @@ export default function Applications() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
-        >
-          + Create App
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleFromGithub}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm font-medium flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+            </svg>
+            From GitHub
+          </button>
+          <button
+            onClick={() => { resetForm(); setShowCreate(true) }}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+          >
+            + Create App
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -102,7 +159,22 @@ export default function Applications() {
             )}
             {appList.map(a => (
               <tr key={a.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium">{a.name}</td>
+                <td className="px-4 py-3 font-medium">
+                  <span>{a.name}</span>
+                  {a.github_repo && (
+                    <a
+                      href={`https://github.com/${a.github_repo}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={a.github_repo}
+                      className="ml-2 text-gray-400 hover:text-gray-600 inline-block align-middle"
+                    >
+                      <svg className="w-3.5 h-3.5 inline" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+                      </svg>
+                    </a>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.docker_image}</td>
                 <td className="px-4 py-3 text-gray-600">
                   {parsePorts(a.ports).join(', ') || '—'}
@@ -121,6 +193,53 @@ export default function Applications() {
           </tbody>
         </table>
       </div>
+
+      {/* Repo Picker Modal */}
+      {showRepoPicker && (
+        <Modal title="Select GitHub Repository" onClose={() => setShowRepoPicker(false)}>
+          {reposLoading ? (
+            <div className="py-8 text-center text-gray-400 text-sm">Loading repositories...</div>
+          ) : (
+            <div className="overflow-auto max-h-96">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b sticky top-0">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Repository</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Description</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {repos.length === 0 && (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-6 text-center text-gray-400">No repositories found</td>
+                    </tr>
+                  )}
+                  {repos.map(repo => (
+                    <tr key={repo.full_name} className="hover:bg-gray-50">
+                      <td className="px-3 py-2.5 font-medium">
+                        {repo.name}
+                        {repo.private && (
+                          <span className="ml-2 px-1.5 py-0.5 text-xs bg-gray-100 text-gray-500 rounded">private</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-gray-500 text-xs">{repo.description || '—'}</td>
+                      <td className="px-3 py-2.5">
+                        <button
+                          onClick={() => handleSelectRepo(repo)}
+                          className="px-3 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+                        >
+                          Select
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Modal>
+      )}
 
       {showCreate && (
         <Modal title="Create Application" onClose={() => setShowCreate(false)}>

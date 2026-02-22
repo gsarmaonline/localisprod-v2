@@ -21,6 +21,7 @@ type Application struct {
 	EnvVars     string    `json:"env_vars"` // JSON {"KEY":"VAL"}
 	Ports       string    `json:"ports"`    // JSON ["8080:80"]
 	Command     string    `json:"command"`
+	GithubRepo  string    `json:"github_repo"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 

@@ -13,10 +13,33 @@ func NewRouter(s *store.Store) http.Handler {
 	appH := handlers.NewApplicationHandler(s)
 	depH := handlers.NewDeploymentHandler(s)
 	dashH := handlers.NewDashboardHandler(s)
+	settingsH := handlers.NewSettingsHandler(s)
+	githubH := handlers.NewGithubHandler(s)
 
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/api/stats", dashH.Stats)
+
+	// Settings
+	mux.HandleFunc("/api/settings", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			settingsH.Get(w, r)
+		case http.MethodPut:
+			settingsH.Update(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// GitHub
+	mux.HandleFunc("/api/github/repos", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			githubH.ListRepos(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// Nodes
 	mux.HandleFunc("/api/nodes", func(w http.ResponseWriter, r *http.Request) {

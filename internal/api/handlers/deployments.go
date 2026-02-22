@@ -70,8 +70,30 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var ports []string
 	_ = json.Unmarshal([]byte(app.Ports), &ports)
 
+	runner := sshexec.NewRunner(node)
+
+	// If image is from ghcr.io, authenticate first
+	if strings.HasPrefix(app.DockerImage, "ghcr.io/") {
+		ghToken, _ := h.store.GetSetting("github_token")
+		ghUsername, _ := h.store.GetSetting("github_username")
+		if ghToken != "" && ghUsername != "" {
+			loginCmd := sshexec.DockerLoginCmd(ghUsername, ghToken)
+			loginOutput, loginErr := runner.Run(loginCmd)
+			if loginErr != nil {
+				_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")
+				deployment.Status = "failed"
+				writeJSON(w, http.StatusOK, map[string]interface{}{
+					"deployment": deployment,
+					"error":      "docker login failed: " + loginErr.Error(),
+					"output":     loginOutput,
+				})
+				return
+			}
+		}
+	}
+
 	cmd := sshexec.DockerRunCmd(containerName, app.DockerImage, ports, envVars, app.Command)
-	output, runErr := sshexec.NewRunner(node).Run(cmd)
+	output, runErr := runner.Run(cmd)
 
 	if runErr != nil {
 		_ = h.store.UpdateDeploymentStatus(deployment.ID, "failed", "")

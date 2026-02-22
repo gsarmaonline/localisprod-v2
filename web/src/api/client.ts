@@ -51,6 +51,7 @@ export interface Application {
   env_vars: string  // JSON string
   ports: string     // JSON string
   command: string
+  github_repo: string
   created_at: string
 }
 
@@ -60,6 +61,7 @@ export interface CreateApplicationInput {
   env_vars: Record<string, string>
   ports: string[]
   command: string
+  github_repo?: string
 }
 
 export const applications = {
@@ -69,6 +71,31 @@ export const applications = {
     request<Application>('/applications', { method: 'POST', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/applications/${id}`, { method: 'DELETE' }),
+}
+
+// GitHub
+export interface GithubRepo {
+  name: string
+  full_name: string
+  description: string
+  private: boolean
+  html_url: string
+}
+
+export const github = {
+  listRepos: () => request<GithubRepo[]>('/github/repos'),
+}
+
+// Settings
+export interface Settings {
+  github_username: string
+  github_token: string  // "configured" | ""
+}
+
+export const settings = {
+  get: () => request<Settings>('/settings'),
+  update: (data: { github_username: string; github_token: string }) =>
+    request<{ status: string }>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
 }
 
 // Deployments

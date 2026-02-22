@@ -25,6 +25,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		EnvVars     map[string]string `json:"env_vars"`
 		Ports       []string          `json:"ports"`
 		Command     string            `json:"command"`
+		GithubRepo  string            `json:"github_repo"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -51,6 +52,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		EnvVars:     string(envJSON),
 		Ports:       string(portsJSON),
 		Command:     body.Command,
+		GithubRepo:  body.GithubRepo,
 		CreatedAt:   time.Now().UTC(),
 	}
 	if err := h.store.CreateApplication(app); err != nil {
