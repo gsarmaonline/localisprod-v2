@@ -1,4 +1,8 @@
-.PHONY: dev-backend dev-frontend build build-frontend build-backend run clean
+.PHONY: dev dev-backend dev-frontend build build-frontend build-backend run clean
+
+# Run both backend and frontend dev servers concurrently
+dev:
+	@(trap 'kill 0' INT; air & cd web && npm run dev)
 
 # Run Go backend with auto-reload (requires: go install github.com/air-verse/air@latest)
 dev-backend:
