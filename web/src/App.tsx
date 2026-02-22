@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
 import Nodes from './pages/Nodes'
@@ -14,14 +15,33 @@ const navItems = [
 ]
 
 export default function App() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-gray-100 flex">
+        {/* Mobile backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/50 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <aside className="w-56 bg-gray-900 text-white flex flex-col">
-          <div className="px-4 py-5 border-b border-gray-700">
-            <h1 className="font-bold text-base tracking-tight">Localisprod</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Cluster Manager</p>
+        <aside className={`fixed inset-y-0 left-0 z-40 w-56 bg-gray-900 text-white flex flex-col transition-transform duration-200 md:relative md:translate-x-0 md:z-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="px-4 py-5 border-b border-gray-700 flex items-center justify-between">
+            <div>
+              <h1 className="font-bold text-base tracking-tight">Localisprod</h1>
+              <p className="text-xs text-gray-400 mt-0.5">Cluster Manager</p>
+            </div>
+            <button
+              className="md:hidden text-gray-400 hover:text-white p-1"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+            >
+              ✕
+            </button>
           </div>
           <nav className="flex-1 px-2 py-4 space-y-1">
             {navItems.map(item => (
@@ -29,6 +49,7 @@ export default function App() {
                 key={item.to}
                 to={item.to}
                 end={item.to === '/'}
+                onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
                     isActive
@@ -45,14 +66,27 @@ export default function App() {
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 p-8 overflow-auto">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/nodes" element={<Nodes />} />
-            <Route path="/applications" element={<Applications />} />
-            <Route path="/deployments" element={<Deployments />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+        <main className="flex-1 overflow-auto min-w-0">
+          {/* Mobile top bar */}
+          <div className="md:hidden flex items-center px-4 py-3 bg-gray-900 text-white">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="text-gray-400 hover:text-white mr-3 text-xl leading-none"
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
+            <span className="font-bold text-sm tracking-tight">Localisprod</span>
+          </div>
+          <div className="p-4 sm:p-8">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/nodes" element={<Nodes />} />
+              <Route path="/applications" element={<Applications />} />
+              <Route path="/deployments" element={<Deployments />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </BrowserRouter>
