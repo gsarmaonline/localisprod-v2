@@ -95,7 +95,7 @@ export default function Settings() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border p-6 max-w-lg">
+      <div className="bg-white rounded-xl shadow-sm border p-6 max-w-lg w-full">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800">GitHub Integration</h2>
           {tokenConfigured ? (
@@ -186,7 +186,7 @@ export default function Settings() {
       </div>
 
       {/* GitHub Actions workflow template */}
-      <div className="mt-6 max-w-2xl">
+      <div className="mt-6 max-w-2xl w-full">
         <button
           onClick={() => setYamlOpen(v => !v)}
           className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
@@ -210,7 +210,7 @@ export default function Settings() {
       </div>
 
       {/* Webhook setup instructions */}
-      <div className="mt-4 max-w-2xl">
+      <div className="mt-4 max-w-2xl w-full">
         <button
           onClick={() => setWebhookOpen(v => !v)}
           className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
