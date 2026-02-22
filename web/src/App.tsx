@@ -1,5 +1,10 @@
 import { useState } from 'react'
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
+import {
+  faGaugeHigh, faServer, faBoxOpen, faBolt, faGear,
+  faBars, faXmark,
+} from '@fortawesome/free-solid-svg-icons'
 import Dashboard from './pages/Dashboard'
 import Nodes from './pages/Nodes'
 import Applications from './pages/Applications'
@@ -7,11 +12,11 @@ import Deployments from './pages/Deployments'
 import Settings from './pages/Settings'
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: '▦' },
-  { to: '/nodes', label: 'Nodes', icon: '⬡' },
-  { to: '/applications', label: 'Applications', icon: '⬜' },
-  { to: '/deployments', label: 'Deployments', icon: '⚡' },
-  { to: '/settings', label: 'Settings', icon: '⚙' },
+  { to: '/', label: 'Dashboard', icon: faGaugeHigh },
+  { to: '/nodes', label: 'Nodes', icon: faServer },
+  { to: '/applications', label: 'Applications', icon: faBoxOpen },
+  { to: '/deployments', label: 'Deployments', icon: faBolt },
+  { to: '/settings', label: 'Settings', icon: faGear },
 ]
 
 export default function App() {
@@ -40,7 +45,7 @@ export default function App() {
               onClick={() => setSidebarOpen(false)}
               aria-label="Close menu"
             >
-              ✕
+              <FontAwesomeIcon icon={faXmark} className="w-4 h-4" />
             </button>
           </div>
           <nav className="flex-1 px-2 py-4 space-y-1">
@@ -58,7 +63,7 @@ export default function App() {
                   }`
                 }
               >
-                <span>{item.icon}</span>
+                <FontAwesomeIcon icon={item.icon} className="w-4 h-4" />
                 {item.label}
               </NavLink>
             ))}
@@ -71,10 +76,10 @@ export default function App() {
           <div className="md:hidden flex items-center px-4 py-3 bg-gray-900 text-white">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="text-gray-400 hover:text-white mr-3 text-xl leading-none"
+              className="text-gray-400 hover:text-white mr-3"
               aria-label="Open menu"
             >
-              ☰
+              <FontAwesomeIcon icon={faBars} className="w-5 h-5" />
             </button>
             <span className="font-bold text-sm tracking-tight">Localisprod</span>
           </div>
