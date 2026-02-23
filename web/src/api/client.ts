@@ -74,6 +74,7 @@ export interface Application {
   command: string
   github_repo: string
   domain: string
+  databases: string // JSON string — array of database IDs
   created_at: string
 }
 
@@ -85,6 +86,44 @@ export interface CreateApplicationInput {
   command: string
   github_repo?: string
   domain?: string
+  databases?: string[]
+}
+
+// Databases
+export interface Database {
+  id: string
+  name: string
+  type: string     // postgres | mysql | redis | mongodb
+  version: string
+  node_id: string
+  node_name: string
+  node_host: string
+  dbname: string
+  db_user: string
+  port: number
+  container_name: string
+  status: string
+  created_at: string
+}
+
+export interface CreateDatabaseInput {
+  name: string
+  type: string
+  version?: string
+  node_id: string
+  dbname?: string
+  db_user?: string
+  password: string
+  port?: number
+}
+
+export const databases = {
+  list: () => request<Database[]>('/databases'),
+  get: (id: string) => request<Database>(`/databases/${id}`),
+  create: (data: CreateDatabaseInput) =>
+    request<Database>('/databases', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/databases/${id}`, { method: 'DELETE' }),
 }
 
 export const applications = {
