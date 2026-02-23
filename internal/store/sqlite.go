@@ -336,6 +336,19 @@ func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	return a, nil
 }
 
+func (s *Store) UpdateApplication(a *models.Application, userID string) error {
+	envVars, err := s.encryptEnvVars(a.EnvVars)
+	if err != nil {
+		return fmt.Errorf("encrypt env_vars: %w", err)
+	}
+	_, err = s.db.Exec(
+		`UPDATE applications SET name=?, docker_image=?, env_vars=?, ports=?, command=?, domain=?
+		 WHERE id=? AND user_id=?`,
+		a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.Domain, a.ID, userID,
+	)
+	return err
+}
+
 func (s *Store) DeleteApplication(id, userID string) error {
 	_, err := s.db.Exec(`DELETE FROM applications WHERE id = ? AND user_id = ?`, id, userID)
 	return err

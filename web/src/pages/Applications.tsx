@@ -8,6 +8,7 @@ export default function Applications() {
   const [appList, setAppList] = useState<Application[]>([])
   const [dbList, setDbList] = useState<Database[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [showRepoPicker, setShowRepoPicker] = useState(false)
   const [repos, setRepos] = useState<GithubRepo[]>([])
   const [reposLoading, setReposLoading] = useState(false)
@@ -58,7 +59,12 @@ export default function Applications() {
         domain: form.domain || undefined,
         databases: form.databases.length > 0 ? form.databases : undefined,
       }
-      await applications.create(data)
+      if (editingId) {
+        await applications.update(editingId, data)
+        setEditingId(null)
+      } else {
+        await applications.create(data)
+      }
       setShowCreate(false)
       resetForm()
       await load()
@@ -67,6 +73,31 @@ export default function Applications() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleEdit = (a: Application) => {
+    let envPairs: { key: string; value: string }[] = [{ key: '', value: '' }]
+    try {
+      const parsed = JSON.parse(a.env_vars) as Record<string, string>
+      const pairs = Object.entries(parsed).map(([key, value]) => ({ key, value }))
+      if (pairs.length > 0) envPairs = pairs
+    } catch { /* keep default */ }
+    let ports: string[] = ['']
+    try {
+      const parsed = JSON.parse(a.ports) as string[]
+      if (parsed.length > 0) ports = parsed
+    } catch { /* keep default */ }
+    setForm({
+      name: a.name,
+      docker_image: a.docker_image,
+      command: a.command || '',
+      github_repo: a.github_repo || '',
+      domain: a.domain || '',
+      envPairs,
+      ports,
+    })
+    setEditingId(a.id)
+    setShowCreate(true)
   }
 
   const handleDelete = async (id: string) => {
@@ -191,7 +222,13 @@ export default function Applications() {
                 </td>
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.domain || '—'}</td>
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.command || '—'}</td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 flex gap-2">
+                  <button
+                    onClick={() => handleEdit(a)}
+                    className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100"
+                  >
+                    Edit
+                  </button>
                   <button
                     onClick={() => handleDelete(a.id)}
                     className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100"
@@ -253,7 +290,7 @@ export default function Applications() {
       )}
 
       {showCreate && (
-        <Modal title="Create Application" onClose={() => setShowCreate(false)}>
+        <Modal title={editingId ? 'Edit Application' : 'Create Application'} onClose={() => { setShowCreate(false); setEditingId(null); resetForm() }}>
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -392,7 +429,7 @@ export default function Applications() {
             )}
 
             <div className="flex gap-2 justify-end pt-2">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
+              <button onClick={() => { setShowCreate(false); setEditingId(null); resetForm() }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
                 Cancel
               </button>
               <button
@@ -400,7 +437,7 @@ export default function Applications() {
                 disabled={loading}
                 className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
               >
-                {loading ? 'Creating...' : 'Create App'}
+                {loading ? 'Saving...' : editingId ? 'Save Changes' : 'Create App'}
               </button>
             </div>
           </div>

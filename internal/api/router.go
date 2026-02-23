@@ -164,6 +164,8 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 		switch r.Method {
 		case http.MethodGet:
 			appH.Get(w, r, id)
+		case http.MethodPut:
+			appH.Update(w, r, id)
 		case http.MethodDelete:
 			appH.Delete(w, r, id)
 		default:
