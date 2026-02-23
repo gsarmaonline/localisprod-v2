@@ -222,6 +222,12 @@ func TraefikLabels(routerName, domain, containerPort string) map[string]string {
 	}
 }
 
+// DockerInspectStatusCmd returns a command that prints the container's State.Status
+// (e.g. "running", "exited", "paused"). Exits non-zero if the container doesn't exist.
+func DockerInspectStatusCmd(containerName string) string {
+	return fmt.Sprintf("docker inspect --format='{{.State.Status}}' %s", shellEscape(containerName))
+}
+
 func DockerPullCmd(image string) string {
 	return "docker pull " + shellEscape(image)
 }

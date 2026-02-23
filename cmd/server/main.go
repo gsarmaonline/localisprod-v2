@@ -2,15 +2,18 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gsarma/localisprod-v2/internal/api"
 	"github.com/gsarma/localisprod-v2/internal/auth"
+	"github.com/gsarma/localisprod-v2/internal/poller"
 	"github.com/gsarma/localisprod-v2/internal/secret"
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
@@ -55,6 +58,20 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to open store: %v", err)
 	}
+
+	pollInterval := 5 * time.Minute
+	if v := os.Getenv("POLL_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			pollInterval = d
+		}
+	}
+	statusInterval := 1 * time.Minute
+	if v := os.Getenv("STATUS_POLL_INTERVAL"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			statusInterval = d
+		}
+	}
+	go poller.New(s, pollInterval, statusInterval).Start(context.Background())
 
 	jwtSvc := auth.NewJWTService(jwtSecret)
 

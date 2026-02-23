@@ -21,6 +21,7 @@ type Node struct {
 	Status         string    `json:"status"`
 	IsLocal        bool      `json:"is_local"`
 	TraefikEnabled bool      `json:"traefik_enabled"`
+	UserID         string    `json:"user_id,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -49,6 +50,7 @@ type Database struct {
 	Port          int       `json:"port"`
 	ContainerName string    `json:"container_name"`
 	Status        string    `json:"status"`
+	UserID        string    `json:"user_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	// Joined fields
 	NodeHost string `json:"node_host,omitempty"`
@@ -62,6 +64,7 @@ type Deployment struct {
 	ContainerName string    `json:"container_name"`
 	ContainerID   string    `json:"container_id"`
 	Status        string    `json:"status"`
+	UserID        string    `json:"user_id,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	// Joined fields
 	AppName     string `json:"app_name,omitempty"`
