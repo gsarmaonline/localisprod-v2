@@ -28,12 +28,31 @@ type Application struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	DockerImage string    `json:"docker_image"`
-	EnvVars     string    `json:"env_vars"` // JSON {"KEY":"VAL"}
-	Ports       string    `json:"ports"`    // JSON ["8080:80"]
+	EnvVars     string    `json:"env_vars"`   // JSON {"KEY":"VAL"}
+	Ports       string    `json:"ports"`      // JSON ["8080:80"]
 	Command     string    `json:"command"`
 	GithubRepo  string    `json:"github_repo"`
 	Domain      string    `json:"domain"`
+	Databases   string    `json:"databases"`  // JSON ["db-id-1"]
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Database struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Type          string    `json:"type"`    // postgres, mysql, redis, mongodb
+	Version       string    `json:"version"`
+	NodeID        string    `json:"node_id"`
+	DBName        string    `json:"dbname"`
+	DBUser        string    `json:"db_user"`
+	Password      string    `json:"password,omitempty"`
+	Port          int       `json:"port"`
+	ContainerName string    `json:"container_name"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
+	// Joined fields
+	NodeHost string `json:"node_host,omitempty"`
+	NodeName string `json:"node_name,omitempty"`
 }
 
 type Deployment struct {

@@ -74,6 +74,20 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var ports []string
 	_ = json.Unmarshal([]byte(app.Ports), &ports)
 
+	// Inject database connection URLs from linked databases
+	var dbIDs []string
+	_ = json.Unmarshal([]byte(app.Databases), &dbIDs)
+	for _, dbID := range dbIDs {
+		db, err := h.store.GetDatabase(dbID, userID)
+		if err != nil || db == nil {
+			continue
+		}
+		if envVars == nil {
+			envVars = map[string]string{}
+		}
+		envVars[DBEnvVarName(db.Name)] = DBConnectionURL(db)
+	}
+
 	runner := sshexec.NewRunner(node)
 
 	// If image is from ghcr.io, authenticate first

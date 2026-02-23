@@ -138,6 +138,8 @@ type RunConfig struct {
 	Command       string
 	Network       string            // "" = no --network flag
 	Labels        map[string]string // arbitrary docker labels
+	Volumes       []string          // "volume-name:/mount/path"
+	Restart       string            // e.g. "unless-stopped"; "" = no --restart flag
 }
 
 // DockerRunCmd builds a docker run command. Env vars are passed via --env-file
@@ -147,9 +149,19 @@ func DockerRunCmd(cfg RunConfig) string {
 	sb.WriteString("docker run -d --name ")
 	sb.WriteString(shellEscape(cfg.ContainerName))
 
+	if cfg.Restart != "" {
+		sb.WriteString(" --restart ")
+		sb.WriteString(shellEscape(cfg.Restart))
+	}
+
 	for _, p := range cfg.Ports {
 		sb.WriteString(" -p ")
 		sb.WriteString(shellEscape(p))
+	}
+
+	for _, v := range cfg.Volumes {
+		sb.WriteString(" -v ")
+		sb.WriteString(shellEscape(v))
 	}
 
 	if cfg.EnvFilePath != "" {
@@ -176,6 +188,11 @@ func DockerRunCmd(cfg RunConfig) string {
 	}
 
 	return sb.String()
+}
+
+// DockerVolumeCreateCmd returns a command to create a named Docker volume (idempotent).
+func DockerVolumeCreateCmd(name string) string {
+	return "docker volume create " + shellEscape(name)
 }
 
 // TraefikSetupCmd returns a shell command that installs Traefik on a node.
@@ -226,7 +243,9 @@ func RemoveFileCmd(path string) string {
 	return fmt.Sprintf("rm -f %s", shellEscape(path))
 }
 
-// shellEscape wraps a string in single quotes for safe shell usage.
-func shellEscape(s string) string {
+// ShellEscape wraps a string in single quotes for safe shell usage.
+func ShellEscape(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
+
+func shellEscape(s string) string { return ShellEscape(s) }

@@ -13,6 +13,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	nodeH := handlers.NewNodeHandler(s)
 	appH := handlers.NewApplicationHandler(s)
 	depH := handlers.NewDeploymentHandler(s)
+	dbH := handlers.NewDatabaseHandler(s)
 	dashH := handlers.NewDashboardHandler(s)
 	settingsH := handlers.NewSettingsHandler(s, appURL)
 	githubH := handlers.NewGithubHandler(s)
@@ -165,6 +166,35 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 			appH.Get(w, r, id)
 		case http.MethodDelete:
 			appH.Delete(w, r, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Databases
+	protectedMux.HandleFunc("/api/databases", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			dbH.List(w, r)
+		case http.MethodPost:
+			dbH.Create(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	protectedMux.HandleFunc("/api/databases/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/databases/")
+		id := strings.TrimSuffix(path, "/")
+		if id == "" {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			dbH.Get(w, r, id)
+		case http.MethodDelete:
+			dbH.Delete(w, r, id)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

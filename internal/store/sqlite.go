@@ -49,6 +49,7 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN traefik_enabled INTEGER NOT NULL DEFAULT 0`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN domain TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN databases TEXT NOT NULL DEFAULT '[]'`)
 	// Multi-tenancy: add user_id to resource tables (idempotent, errors ignored)
 	_, _ = s.db.Exec(`ALTER TABLE nodes        ADD COLUMN user_id TEXT REFERENCES users(id)`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN user_id TEXT REFERENCES users(id)`)
@@ -94,6 +95,23 @@ CREATE TABLE IF NOT EXISTS applications (
   command TEXT NOT NULL DEFAULT '',
   github_repo TEXT NOT NULL DEFAULT '',
   domain TEXT NOT NULL DEFAULT '',
+  databases TEXT NOT NULL DEFAULT '[]',
+  user_id TEXT REFERENCES users(id),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS databases (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL,
+  version TEXT NOT NULL DEFAULT 'latest',
+  node_id TEXT NOT NULL REFERENCES nodes(id),
+  dbname TEXT NOT NULL DEFAULT '',
+  db_user TEXT NOT NULL DEFAULT '',
+  password TEXT NOT NULL DEFAULT '',
+  port INTEGER NOT NULL DEFAULT 0,
+  container_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -271,16 +289,16 @@ func (s *Store) CreateApplication(a *models.Application, userID string) error {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, domain, user_id, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, userID, a.CreatedAt,
+		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.Databases, userID, a.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, created_at
 		 FROM applications WHERE user_id = ? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -289,7 +307,7 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -303,9 +321,9 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, created_at
 		 FROM applications WHERE id = ? AND user_id = ?`, id, userID,
-	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -325,7 +343,7 @@ func (s *Store) DeleteApplication(id, userID string) error {
 
 func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, created_at
+		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, created_at
 		 FROM applications WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
 	if err != nil {
 		return nil, err
@@ -334,7 +352,7 @@ func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*mod
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -460,6 +478,80 @@ func (s *Store) CountApplications(userID string) (int, error) {
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM applications WHERE user_id = ?`, userID).Scan(&count)
 	return count, err
+}
+
+// Databases
+
+func (s *Store) CreateDatabase(d *models.Database, userID string) error {
+	password, err := s.encryptEnvVars(d.Password)
+	if err != nil {
+		return fmt.Errorf("encrypt password: %w", err)
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO databases (id, name, type, version, node_id, dbname, db_user, password, port, container_name, status, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		d.ID, d.Name, d.Type, d.Version, d.NodeID, d.DBName, d.DBUser, password, d.Port, d.ContainerName, d.Status, userID, d.CreatedAt,
+	)
+	return err
+}
+
+func (s *Store) ListDatabases(userID string) ([]*models.Database, error) {
+	rows, err := s.db.Query(`
+		SELECT d.id, d.name, d.type, d.version, d.node_id, d.dbname, d.db_user, d.password,
+		       d.port, d.container_name, d.status, d.created_at, n.host, n.name
+		FROM databases d
+		JOIN nodes n ON d.node_id = n.id
+		WHERE d.user_id = ?
+		ORDER BY d.created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var dbs []*models.Database
+	for rows.Next() {
+		d := &models.Database{}
+		if err := rows.Scan(&d.ID, &d.Name, &d.Type, &d.Version, &d.NodeID, &d.DBName, &d.DBUser, &d.Password,
+			&d.Port, &d.ContainerName, &d.Status, &d.CreatedAt, &d.NodeHost, &d.NodeName); err != nil {
+			return nil, err
+		}
+		if d.Password, err = s.decryptEnvVars(d.Password); err != nil {
+			return nil, fmt.Errorf("decrypt password for %s: %w", d.ID, err)
+		}
+		dbs = append(dbs, d)
+	}
+	return dbs, rows.Err()
+}
+
+func (s *Store) GetDatabase(id, userID string) (*models.Database, error) {
+	d := &models.Database{}
+	err := s.db.QueryRow(`
+		SELECT d.id, d.name, d.type, d.version, d.node_id, d.dbname, d.db_user, d.password,
+		       d.port, d.container_name, d.status, d.created_at, n.host, n.name
+		FROM databases d
+		JOIN nodes n ON d.node_id = n.id
+		WHERE d.id = ? AND d.user_id = ?`, id, userID,
+	).Scan(&d.ID, &d.Name, &d.Type, &d.Version, &d.NodeID, &d.DBName, &d.DBUser, &d.Password,
+		&d.Port, &d.ContainerName, &d.Status, &d.CreatedAt, &d.NodeHost, &d.NodeName)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if d.Password, err = s.decryptEnvVars(d.Password); err != nil {
+		return nil, fmt.Errorf("decrypt password for %s: %w", id, err)
+	}
+	return d, nil
+}
+
+func (s *Store) UpdateDatabaseStatus(id, userID, status string) error {
+	_, err := s.db.Exec(`UPDATE databases SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
+	return err
+}
+
+func (s *Store) DeleteDatabase(id, userID string) error {
+	_, err := s.db.Exec(`DELETE FROM databases WHERE id = ? AND user_id = ?`, id, userID)
+	return err
 }
 
 // Settings (global, kept for legacy; prefer user settings)
