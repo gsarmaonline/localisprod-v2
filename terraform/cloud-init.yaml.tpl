@@ -68,6 +68,11 @@ runcmd:
   - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   - apt-get install -y nodejs
 
+  # -- Docker ---------------------------------------------------------------
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable docker
+  - systemctl start docker
+
   # -- GitHub deploy key (needed for private repos) -------------------------
   %{ if github_deploy_key != "" ~}
   - mkdir -p /root/.ssh
