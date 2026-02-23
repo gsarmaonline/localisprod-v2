@@ -40,6 +40,24 @@ variable "secret_key" {
   default     = ""
 }
 
+variable "jwt_secret" {
+  description = "Secret key for signing JWTs. Generate with: openssl rand -base64 32"
+  type        = string
+  sensitive   = true
+}
+
+variable "google_client_id" {
+  description = "Google OAuth client ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "google_client_secret" {
+  description = "Google OAuth client secret"
+  type        = string
+  sensitive   = true
+}
+
 variable "port" {
   description = "HTTP port the server listens on"
   type        = number
@@ -58,7 +76,7 @@ variable "acme_email" {
 }
 
 variable "traefik_version" {
-  description = "Traefik release version to install (e.g. v3.2.11)"
+  description = "Traefik release version to install (e.g. v3.6.8)"
   type        = string
-  default     = "v3.2.11"
+  default     = "v3.6.8"
 }

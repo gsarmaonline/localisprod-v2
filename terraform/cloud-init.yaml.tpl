@@ -48,27 +48,27 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
-  # ── Swap (essential for 1 GB droplets: npm build can easily OOM) ─────────
+  # -- Swap (essential for 1 GB droplets: npm build can easily OOM) ---------
   - fallocate -l 1G /swapfile
   - chmod 600 /swapfile
   - mkswap /swapfile
   - swapon /swapfile
   - echo '/swapfile none swap sw 0 0' >> /etc/fstab
 
-  # ── App user ─────────────────────────────────────────────────────────────
+  # -- App user -------------------------------------------------------------
   - useradd -r -s /bin/false -m -d /opt/localisprod localisprod
 
-  # ── Go 1.24 ──────────────────────────────────────────────────────────────
+  # -- Go 1.24 --------------------------------------------------------------
   - wget -q https://go.dev/dl/go1.24.1.linux-amd64.tar.gz -O /tmp/go.tar.gz
   - tar -C /usr/local -xzf /tmp/go.tar.gz
   - rm /tmp/go.tar.gz
   - echo 'export PATH=$PATH:/usr/local/go/bin' > /etc/profile.d/go.sh
 
-  # ── Node.js 20 LTS ───────────────────────────────────────────────────────
+  # -- Node.js 20 LTS -------------------------------------------------------
   - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
   - apt-get install -y nodejs
 
-  # ── GitHub deploy key (needed for private repos) ─────────────────────────
+  # -- GitHub deploy key (needed for private repos) -------------------------
   %{ if github_deploy_key != "" ~}
   - mkdir -p /root/.ssh
   - chmod 700 /root/.ssh
@@ -85,30 +85,34 @@ runcmd:
     SSHEOF
   %{ endif ~}
 
-  # ── Clone repo ───────────────────────────────────────────────────────────
+  # -- Clone repo -----------------------------------------------------------
   - git clone ${repo_url} /opt/localisprod/app
 
-  # ── Write .env (after git clone creates the directory) ───────────────────
+  # -- Write .env (after git clone creates the directory) -------------------
   - |
     cat > /opt/localisprod/app/.env <<'ENVEOF'
     PORT=${port}
     DB_PATH=/opt/localisprod/app/cluster.db
     SECRET_KEY=${secret_key}
+    JWT_SECRET=${jwt_secret}
+    GOOGLE_CLIENT_ID=${google_client_id}
+    GOOGLE_CLIENT_SECRET=${google_client_secret}
+    APP_URL=https://${domain}
     ENVEOF
   - chmod 600 /opt/localisprod/app/.env
 
-  # ── Build frontend ────────────────────────────────────────────────────────
+  # -- Build frontend --------------------------------------------------------
   - cd /opt/localisprod/app/web && npm ci && npm run build
 
-  # ── Build backend ─────────────────────────────────────────────────────────
+  # -- Build backend ---------------------------------------------------------
   # Must run from the module root so go.mod is found; bin/ is gitignored so mkdir first
   - mkdir -p /opt/localisprod/app/bin
-  - cd /opt/localisprod/app && /usr/local/go/bin/go build -o bin/server ./cmd/server/main.go
+  - cd /opt/localisprod/app && HOME=/root GOPATH=/root/go /usr/local/go/bin/go build -o bin/server ./cmd/server/main.go
 
-  # ── Fix ownership ─────────────────────────────────────────────────────────
+  # -- Fix ownership ---------------------------------------------------------
   - chown -R localisprod:localisprod /opt/localisprod
 
-  # ── Traefik ───────────────────────────────────────────────────────────────
+  # -- Traefik ---------------------------------------------------------------
   - curl -sL https://github.com/traefik/traefik/releases/download/${traefik_version}/traefik_${traefik_version}_linux_amd64.tar.gz -o /tmp/traefik.tar.gz
   - tar -C /usr/local/bin -xzf /tmp/traefik.tar.gz traefik
   - rm /tmp/traefik.tar.gz
@@ -160,7 +164,7 @@ runcmd:
   - touch /var/lib/traefik/acme.json
   - chmod 600 /var/lib/traefik/acme.json
 
-  # ── Start services ────────────────────────────────────────────────────────
+  # -- Start services --------------------------------------------------------
   - systemctl daemon-reload
   - systemctl enable localisprod
   - systemctl start localisprod
