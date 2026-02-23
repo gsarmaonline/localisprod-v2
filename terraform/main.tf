@@ -23,6 +23,9 @@ resource "digitalocean_droplet" "localisprod" {
     secret_key        = var.secret_key
     port              = var.port
     github_deploy_key = var.github_deploy_key
+    domain            = var.domain
+    acme_email        = var.acme_email
+    traefik_version   = var.traefik_version
   })
 }
 
@@ -38,7 +41,13 @@ resource "digitalocean_firewall" "localisprod" {
 
   inbound_rule {
     protocol         = "tcp"
-    port_range       = tostring(var.port)
+    port_range       = "80"
+    source_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  inbound_rule {
+    protocol         = "tcp"
+    port_range       = "443"
     source_addresses = ["0.0.0.0/0", "::/0"]
   }
 

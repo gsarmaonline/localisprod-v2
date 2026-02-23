@@ -9,6 +9,24 @@ packages:
   - make
 
 write_files:
+  - path: /etc/systemd/system/traefik.service
+    content: |
+      [Unit]
+      Description=Traefik Reverse Proxy
+      After=network.target localisprod.service
+
+      [Service]
+      Type=simple
+      User=root
+      ExecStart=/usr/local/bin/traefik --configFile=/etc/traefik/traefik.yaml
+      Restart=on-failure
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
   - path: /etc/systemd/system/localisprod.service
     content: |
       [Unit]
@@ -90,7 +108,61 @@ runcmd:
   # ── Fix ownership ─────────────────────────────────────────────────────────
   - chown -R localisprod:localisprod /opt/localisprod
 
-  # ── Start service ─────────────────────────────────────────────────────────
+  # ── Traefik ───────────────────────────────────────────────────────────────
+  - curl -sL https://github.com/traefik/traefik/releases/download/${traefik_version}/traefik_${traefik_version}_linux_amd64.tar.gz -o /tmp/traefik.tar.gz
+  - tar -C /usr/local/bin -xzf /tmp/traefik.tar.gz traefik
+  - rm /tmp/traefik.tar.gz
+  - chmod +x /usr/local/bin/traefik
+  - mkdir -p /etc/traefik/dynamic /var/lib/traefik
+  - |
+    cat > /etc/traefik/traefik.yaml <<'TRAEFIKEOF'
+    entryPoints:
+      web:
+        address: ":80"
+        http:
+          redirections:
+            entryPoint:
+              to: websecure
+              scheme: https
+      websecure:
+        address: ":443"
+    providers:
+      file:
+        directory: /etc/traefik/dynamic
+        watch: true
+    certificatesResolvers:
+      letsencrypt:
+        acme:
+          email: ${acme_email}
+          storage: /var/lib/traefik/acme.json
+          httpChallenge:
+            entryPoint: web
+    log:
+      level: INFO
+    TRAEFIKEOF
+  - |
+    cat > /etc/traefik/dynamic/localisprod.yaml <<'DYNEOF'
+    http:
+      routers:
+        localisprod:
+          rule: "Host(`${domain}`)"
+          entryPoints:
+            - websecure
+          service: localisprod
+          tls:
+            certResolver: letsencrypt
+      services:
+        localisprod:
+          loadBalancer:
+            servers:
+              - url: "http://localhost:${port}"
+    DYNEOF
+  - touch /var/lib/traefik/acme.json
+  - chmod 600 /var/lib/traefik/acme.json
+
+  # ── Start services ────────────────────────────────────────────────────────
   - systemctl daemon-reload
   - systemctl enable localisprod
   - systemctl start localisprod
+  - systemctl enable traefik
+  - systemctl start traefik

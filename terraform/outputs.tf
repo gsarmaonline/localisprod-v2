@@ -5,7 +5,7 @@ output "droplet_ip" {
 
 output "app_url" {
   description = "URL to access the localisprod web UI"
-  value       = "http://${digitalocean_droplet.localisprod.ipv4_address}:${var.port}"
+  value       = "https://${var.domain}"
 }
 
 output "ssh_command" {
