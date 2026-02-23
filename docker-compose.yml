@@ -1,0 +1,24 @@
+services:
+  localisprod:
+    image: ghcr.io/gsarmaonline/localisprod-v2:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - localisprod-data:/data
+    env_file:
+      - .env
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    command: --label-enable --interval 60 --cleanup
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=60
+
+volumes:
+  localisprod-data:

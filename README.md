@@ -48,7 +48,18 @@ make dev-frontend
 
 Open http://localhost:5173
 
-### Production
+### Production (Docker — recommended)
+
+A `Dockerfile` and `docker-compose.yml` are included for containerised deployment.
+
+```bash
+# Build and run locally
+docker compose up --build
+```
+
+For self-hosted deployment on a server, see **[Continuous Deployment](#continuous-deployment)** below.
+
+### Production (binary)
 
 ```bash
 # Build frontend + backend binary
@@ -117,6 +128,23 @@ All `/api/*` routes except `/api/auth/google`, `/api/auth/google/callback`, and 
 | GET    | `/api/settings`                       | Get GitHub + webhook settings    |
 | PUT    | `/api/settings`                       | Update GitHub + webhook settings |
 | POST   | `/api/webhooks/github/{token}`        | Per-user GitHub registry webhook |
+
+## Continuous Deployment
+
+The repository uses GitHub Actions (`.github/workflows/ci.yml`) for CI/CD:
+
+- **On every PR**: runs Go tests + frontend build
+- **On push to `main`**: tests pass → Docker image built and pushed to `ghcr.io/gsarmaonline/localisprod-v2:latest`
+
+On the server, [Watchtower](https://containrrr.dev/watchtower/) polls GHCR every 60 seconds and automatically pulls and restarts the `localisprod` container when a new image is available. Only the labeled `localisprod` container is managed by Watchtower — workload containers deployed by the app are untouched.
+
+**Initial server setup:**
+```bash
+# Copy docker-compose.yml and .env to the server, then:
+docker compose up -d
+```
+
+After that, every push to `main` triggers an automatic deploy with no manual steps.
 
 ## GitHub Webhook Auto-Redeploy
 
