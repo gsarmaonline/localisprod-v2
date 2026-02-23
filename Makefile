@@ -36,7 +36,7 @@ clean:
 
 # Build Linux binary for deployment
 build-linux:
-	GOOS=linux GOARCH=amd64 go build -o bin/server-linux ./cmd/server/main.go
+	GOOS=linux GOARCH=amd64 go build -o bin/server-linux ./cmd/server/
 
 # Deploy backend binary only (cross-compile + stop service + upload + restart)
 deploy-backend: build-linux
