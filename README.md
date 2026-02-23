@@ -6,7 +6,8 @@ A cluster management system for deploying Docker containers to SSH-accessible no
 
 - **Google OAuth login** — each Google account gets an isolated workspace
 - Register SSH nodes (host, port, username, private key)
-- Define applications (Docker image, env vars, port mappings, command)
+- Define applications (Docker image, env vars, port mappings, command, linked databases)
+- Provision managed databases (Postgres, MySQL, Redis, MongoDB) on nodes — connection URLs auto-injected into linked app deployments
 - Deploy applications as Docker containers onto nodes via SSH
 - View container logs, restart or stop deployments
 - Dashboard with live counts across nodes, apps, and deployment statuses
@@ -103,6 +104,10 @@ All `/api/*` routes except `/api/auth/google`, `/api/auth/google/callback`, and 
 | POST   | `/api/applications`                   | Create application               |
 | GET    | `/api/applications`                   | List applications                |
 | DELETE | `/api/applications/:id`               | Delete application               |
+| POST   | `/api/databases`                      | Provision a database             |
+| GET    | `/api/databases`                      | List databases                   |
+| GET    | `/api/databases/:id`                  | Get database                     |
+| DELETE | `/api/databases/:id`                  | Stop + remove database           |
 | POST   | `/api/deployments`                    | Deploy app to node               |
 | GET    | `/api/deployments`                    | List deployments                 |
 | DELETE | `/api/deployments/:id`                | Stop + remove deployment         |

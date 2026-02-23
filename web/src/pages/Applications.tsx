@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGithub } from '@fortawesome/free-brands-svg-icons'
-import { applications, github, settings, Application, CreateApplicationInput, GithubRepo } from '../api/client'
+import { applications, databases, github, settings, Application, Database, CreateApplicationInput, GithubRepo } from '../api/client'
 import Modal from '../components/Modal'
 
 export default function Applications() {
   const [appList, setAppList] = useState<Application[]>([])
+  const [dbList, setDbList] = useState<Database[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [showRepoPicker, setShowRepoPicker] = useState(false)
   const [repos, setRepos] = useState<GithubRepo[]>([])
@@ -21,19 +22,24 @@ export default function Applications() {
     domain: string
     envPairs: { key: string; value: string }[]
     ports: string[]
+    databases: string[]
   }>({
     name: '', docker_image: '', command: '', github_repo: '', domain: '',
     envPairs: [{ key: '', value: '' }],
     ports: [''],
+    databases: [],
   })
 
   const resetForm = () =>
-    setForm({ name: '', docker_image: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''] })
+    setForm({ name: '', docker_image: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [] })
 
   const load = () =>
     applications.list().then(setAppList).catch(e => setError(e.message))
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    databases.list().then(setDbList).catch(() => {})
+  }, [])
 
   const handleCreate = async () => {
     try {
@@ -50,6 +56,7 @@ export default function Applications() {
         ports: form.ports.filter(Boolean),
         github_repo: form.github_repo || undefined,
         domain: form.domain || undefined,
+        databases: form.databases.length > 0 ? form.databases : undefined,
       }
       await applications.create(data)
       setShowCreate(false)
@@ -107,6 +114,7 @@ export default function Applications() {
       domain: '',
       envPairs: [{ key: '', value: '' }],
       ports: [''],
+      databases: [],
     })
     setShowCreate(true)
   }
@@ -345,6 +353,43 @@ export default function Applications() {
                 className="text-xs text-purple-600 hover:underline"
               >+ Add variable</button>
             </div>
+
+            {/* Databases */}
+            {dbList.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Linked Databases</label>
+                <div className="space-y-1 border rounded-lg p-2">
+                  {dbList.map(db => {
+                    const checked = form.databases.includes(db.id)
+                    return (
+                      <label key={db.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setForm(prev => ({
+                              ...prev,
+                              databases: checked
+                                ? prev.databases.filter(id => id !== db.id)
+                                : [...prev.databases, db.id],
+                            }))
+                          }
+                          className="accent-emerald-600"
+                        />
+                        <span className="font-medium">{db.name}</span>
+                        <span className="text-gray-400 text-xs">{db.type}:{db.version}</span>
+                        {checked && (
+                          <span className="ml-auto font-mono text-xs text-emerald-600">
+                            {db.name.toUpperCase().replace(/[-\s.]/g, '_')}_URL
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">Connection URLs are injected automatically as env vars on deploy.</p>
+              </div>
+            )}
 
             <div className="flex gap-2 justify-end pt-2">
               <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
