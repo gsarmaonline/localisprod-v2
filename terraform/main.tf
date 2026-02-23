@@ -28,7 +28,6 @@ resource "digitalocean_droplet" "localisprod" {
     github_deploy_key    = var.github_deploy_key
     domain               = var.domain
     acme_email           = var.acme_email
-    traefik_version      = var.traefik_version
   })
 }
 
