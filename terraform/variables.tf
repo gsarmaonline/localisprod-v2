@@ -45,3 +45,20 @@ variable "port" {
   type        = number
   default     = 8080
 }
+
+variable "domain" {
+  description = "Domain name to serve the app on (must point to the droplet IP in DNS)"
+  type        = string
+  default     = "localisprod.com"
+}
+
+variable "acme_email" {
+  description = "Email address for Let's Encrypt certificate notifications"
+  type        = string
+}
+
+variable "traefik_version" {
+  description = "Traefik release version to install (e.g. v3.2.11)"
+  type        = string
+  default     = "v3.2.11"
+}
