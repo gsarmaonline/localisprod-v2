@@ -262,6 +262,26 @@ func (s *Store) GetNode(id, userID string) (*models.Node, error) {
 	return n, err
 }
 
+// ListAllNodes returns every node across all users. Used by the background poller.
+func (s *Store) ListAllNodes() ([]*models.Node, error) {
+	rows, err := s.db.Query(
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at, user_id
+		 FROM nodes WHERE user_id IS NOT NULL ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var nodes []*models.Node
+	for rows.Next() {
+		n := &models.Node{}
+		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt, &n.UserID); err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, n)
+	}
+	return nodes, rows.Err()
+}
+
 func (s *Store) UpdateNodeStatus(id, userID, status string) error {
 	_, err := s.db.Exec(`UPDATE nodes SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
 	return err
@@ -453,6 +473,32 @@ func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.D
 	return deployments, rows.Err()
 }
 
+// ListAllRunningDeployments returns every deployment with status="running" across all users.
+// Used by the background poller to check for new images.
+func (s *Store) ListAllRunningDeployments() ([]*models.Deployment, error) {
+	rows, err := s.db.Query(`
+		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
+		       a.name, n.name, a.docker_image, d.user_id
+		FROM deployments d
+		JOIN applications a ON d.application_id = a.id
+		JOIN nodes n ON d.node_id = n.id
+		WHERE d.status = 'running' AND d.user_id IS NOT NULL
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var deployments []*models.Deployment
+	for rows.Next() {
+		d := &models.Deployment{}
+		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage, &d.UserID); err != nil {
+			return nil, err
+		}
+		deployments = append(deployments, d)
+	}
+	return deployments, rows.Err()
+}
+
 func (s *Store) UpdateDeploymentStatus(id, userID, status, containerID string) error {
 	_, err := s.db.Exec(`UPDATE deployments SET status = ?, container_id = ? WHERE id = ? AND user_id = ?`, status, containerID, id, userID)
 	return err
@@ -555,6 +601,29 @@ func (s *Store) GetDatabase(id, userID string) (*models.Database, error) {
 		return nil, fmt.Errorf("decrypt password for %s: %w", id, err)
 	}
 	return d, nil
+}
+
+// ListAllRunningDatabases returns every database with status="running" across all users.
+// Used by the background poller to health-check containers.
+func (s *Store) ListAllRunningDatabases() ([]*models.Database, error) {
+	rows, err := s.db.Query(`
+		SELECT id, container_name, node_id, user_id
+		FROM databases
+		WHERE status = 'running' AND user_id IS NOT NULL
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var dbs []*models.Database
+	for rows.Next() {
+		d := &models.Database{}
+		if err := rows.Scan(&d.ID, &d.ContainerName, &d.NodeID, &d.UserID); err != nil {
+			return nil, err
+		}
+		dbs = append(dbs, d)
+	}
+	return dbs, rows.Err()
 }
 
 func (s *Store) UpdateDatabaseStatus(id, userID, status string) error {

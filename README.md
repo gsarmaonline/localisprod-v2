@@ -13,6 +13,8 @@ A cluster management system for deploying Docker containers to SSH-accessible no
 - Dashboard with live counts across nodes, apps, and deployment statuses
 - **GitHub webhook auto-redeploy**: automatically re-pulls and restarts containers when a new image is published to GHCR
 - **Per-user webhook URL**: each user has a personal webhook endpoint so multiple accounts can integrate with different GitHub repos
+- **Background image poller**: periodically pulls each deployment's image and redeploys automatically when a newer version is available (no webhook required)
+- **Background health reconciliation**: pings every node and `docker inspect`s every running container on a regular interval, keeping node/deployment/database status accurate in real time
 
 ## Tech Stack
 
@@ -77,6 +79,8 @@ Can be set in a `.env` file at the project root or as real environment variables
 | `PORT`                 | `8080`                         | HTTP server port |
 | `DB_PATH`              | `cluster.db`                   | Path to SQLite database |
 | `SECRET_KEY`           | *(unset)*                      | Base64-encoded 32-byte key for AES-256-GCM encryption of env vars. Generate: `openssl rand -base64 32` |
+| `POLL_INTERVAL`        | `5m`                           | How often the background poller checks for newer Docker images and redeploys (Go duration, e.g. `2m`, `10m`) |
+| `STATUS_POLL_INTERVAL` | `1m`                           | How often nodes are pinged and containers are health-checked to reconcile status in the database |
 
 `.env` example:
 ```
