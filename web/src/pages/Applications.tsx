@@ -484,15 +484,24 @@ export default function Applications() {
                         <span className="font-medium">{db.name}</span>
                         <span className="text-gray-400 text-xs">{db.type}:{db.version}</span>
                         {checked && (
-                          <span className="ml-auto font-mono text-xs text-emerald-600">
-                            {db.name.toUpperCase().replace(/[-\s.]/g, '_')}_URL
+                          <span className="ml-auto flex items-center gap-1.5">
+                            <span className="font-mono text-xs text-emerald-600">
+                              {db.name.toUpperCase().replace(/[-\s.]/g, '_')}_URL
+                            </span>
+                            {form.databases.length === 1 && (
+                              <span className="font-mono text-xs text-emerald-600">· DATABASE_URL</span>
+                            )}
                           </span>
                         )}
                       </label>
                     )
                   })}
                 </div>
-                <p className="mt-1 text-xs text-gray-400">Connection URLs are injected automatically as env vars on deploy.</p>
+                <p className="mt-1 text-xs text-gray-400">
+                  {form.databases.length === 1
+                    ? 'DATABASE_URL is also set automatically. Add DATABASE_URL to env vars above to override it.'
+                    : 'Connection URLs are injected automatically as env vars on deploy.'}
+                </p>
               </div>
             )}
 

@@ -87,6 +87,16 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		envVars[DBEnvVarName(db.Name)] = DBConnectionURL(db)
 	}
+	// For single-database apps, also inject DATABASE_URL as a convenience alias
+	// unless the user has already set it explicitly.
+	if len(dbIDs) == 1 {
+		if _, exists := envVars["DATABASE_URL"]; !exists {
+			db, err := h.store.GetDatabase(dbIDs[0], userID)
+			if err == nil && db != nil {
+				envVars["DATABASE_URL"] = DBConnectionURL(db)
+			}
+		}
+	}
 
 	runner := sshexec.NewRunner(node)
 
