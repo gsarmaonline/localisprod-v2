@@ -19,13 +19,10 @@ resource "digitalocean_droplet" "localisprod" {
   image     = "ubuntu-22-04-x64"
   ssh_keys  = [var.ssh_key_fingerprint]
   user_data = templatefile("${path.module}/cloud-init.yaml.tpl", {
-    repo_url             = var.repo_url
     secret_key           = var.secret_key
     jwt_secret           = var.jwt_secret
     google_client_id     = var.google_client_id
     google_client_secret = var.google_client_secret
-    port                 = var.port
-    github_deploy_key    = var.github_deploy_key
     domain               = var.domain
     acme_email           = var.acme_email
   })

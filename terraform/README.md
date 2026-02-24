@@ -8,6 +8,7 @@ Provisions a DigitalOcean droplet and bootstraps localisprod via cloud-init.
 - [doctl](https://docs.digitalocean.com/reference/doctl/how-to/install/) (optional, for key fingerprints)
 - A DigitalOcean API token
 - An SSH key already added to your DigitalOcean account
+- The Docker image published to GHCR (`push to main` triggers CI to publish it)
 
 ## Usage
 
@@ -27,18 +28,13 @@ terraform apply
 terraform output
 ```
 
-## GitHub Actions secrets
+## Continuous deployment
 
-After `terraform apply`, set these in **GitHub → Settings → Secrets and variables → Actions**:
-
-| Secret             | Value                                          |
-|--------------------|------------------------------------------------|
-| `DO_DROPLET_IP`    | IP from `terraform output droplet_ip`          |
-| `DEPLOY_SSH_KEY`   | Private key whose public key is on the droplet |
-
-The CI workflow (`.github/workflows/ci.yml`) will then:
+No additional GitHub secrets are needed. The CI workflow (`.github/workflows/ci.yml`) will:
 1. Build and test on every push / PR
-2. SSH into the droplet and redeploy automatically on every push to `main`
+2. Build and push the Docker image to GHCR on every push to `main`
+
+Watchtower running on the droplet checks GHCR every 60 seconds and automatically pulls and restarts the container when a new image is available.
 
 ## DNS setup
 
@@ -54,12 +50,16 @@ Traefik will obtain a Let's Encrypt TLS certificate automatically on first reque
 
 ```bash
 ssh root@<droplet-ip>
+cd /opt/localisprod/app
 
 # App logs
-journalctl -u localisprod -f
+docker compose logs localisprod -f
 
 # Traefik logs (proxy + TLS)
-journalctl -u traefik -f
+docker compose logs traefik -f
+
+# All services
+docker compose logs -f
 ```
 
 ## Variables
@@ -68,11 +68,8 @@ journalctl -u traefik -f
 |----------------------|-------------------|--------------------------------------------------|
 | `do_token`           | *(required)*      | DigitalOcean API token                           |
 | `ssh_key_fingerprint`| *(required)*      | Fingerprint of SSH key in your DO account        |
-| `repo_url`           | *(required)*      | Git clone URL for this repo                      |
 | `acme_email`         | *(required)*      | Email for Let's Encrypt certificate alerts       |
 | `secret_key`         | `""`              | AES-256-GCM key (`openssl rand -base64 32`)      |
 | `domain`             | `localisprod.com` | Domain to serve the app on                       |
-| `traefik_version`    | `v3.2.11`         | Traefik release version to install               |
 | `region`             | `nyc3`            | DO region slug                                   |
 | `droplet_size`       | `s-1vcpu-1gb`     | DO size slug                                     |
-| `port`               | `8080`            | Internal HTTP port (not publicly exposed)        |
