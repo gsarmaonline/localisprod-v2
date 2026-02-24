@@ -50,6 +50,7 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN domain TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN databases TEXT NOT NULL DEFAULT '[]'`)
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN dockerfile_path TEXT NOT NULL DEFAULT ''`)
 	// Multi-tenancy: add user_id to resource tables (idempotent, errors ignored)
 	_, _ = s.db.Exec(`ALTER TABLE nodes        ADD COLUMN user_id TEXT REFERENCES users(id)`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN user_id TEXT REFERENCES users(id)`)
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS applications (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   docker_image TEXT NOT NULL,
+  dockerfile_path TEXT NOT NULL DEFAULT '',
   env_vars TEXT NOT NULL DEFAULT '{}',
   ports TEXT NOT NULL DEFAULT '[]',
   command TEXT NOT NULL DEFAULT '',
@@ -309,16 +311,16 @@ func (s *Store) CreateApplication(a *models.Application, userID string) error {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, user_id, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.Databases, userID, a.CreatedAt,
+		`INSERT INTO applications (id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.Databases, userID, a.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, created_at
 		 FROM applications WHERE user_id = ? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -327,7 +329,7 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -341,9 +343,9 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, created_at
 		 FROM applications WHERE id = ? AND user_id = ?`, id, userID,
-	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -362,9 +364,9 @@ func (s *Store) UpdateApplication(a *models.Application, userID string) error {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`UPDATE applications SET name=?, docker_image=?, env_vars=?, ports=?, command=?, domain=?
+		`UPDATE applications SET name=?, docker_image=?, dockerfile_path=?, env_vars=?, ports=?, command=?, domain=?
 		 WHERE id=? AND user_id=?`,
-		a.Name, a.DockerImage, envVars, a.Ports, a.Command, a.Domain, a.ID, userID,
+		a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.Domain, a.ID, userID,
 	)
 	return err
 }
@@ -376,7 +378,7 @@ func (s *Store) DeleteApplication(id, userID string) error {
 
 func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, env_vars, ports, command, github_repo, domain, databases, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, created_at
 		 FROM applications WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
 	if err != nil {
 		return nil, err
@@ -385,7 +387,7 @@ func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*mod
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {

@@ -26,16 +26,17 @@ type Node struct {
 }
 
 type Application struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	DockerImage string    `json:"docker_image"`
-	EnvVars     string    `json:"env_vars"`   // JSON {"KEY":"VAL"}
-	Ports       string    `json:"ports"`      // JSON ["8080:80"]
-	Command     string    `json:"command"`
-	GithubRepo  string    `json:"github_repo"`
-	Domain      string    `json:"domain"`
-	Databases   string    `json:"databases"`  // JSON ["db-id-1"]
-	CreatedAt   time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	DockerImage    string    `json:"docker_image"`
+	DockerfilePath string    `json:"dockerfile_path"`
+	EnvVars        string    `json:"env_vars"`   // JSON {"KEY":"VAL"}
+	Ports          string    `json:"ports"`      // JSON ["8080:80"]
+	Command        string    `json:"command"`
+	GithubRepo     string    `json:"github_repo"`
+	Domain         string    `json:"domain"`
+	Databases      string    `json:"databases"`  // JSON ["db-id-1"]
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Database struct {
