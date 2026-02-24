@@ -75,8 +75,3 @@ variable "acme_email" {
   type        = string
 }
 
-variable "traefik_version" {
-  description = "Traefik release version to install (e.g. v3.6.8)"
-  type        = string
-  default     = "v3.6.8"
-}

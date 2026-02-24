@@ -1,0 +1,11 @@
+bin/
+web/dist/
+web/node_modules/
+*.db
+.env
+.env.*
+!.env.example
+terraform/
+.git/
+.claude/
+.air.toml

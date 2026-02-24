@@ -15,4 +15,3 @@ port                = 8080
 
 domain              = "localisprod.com"    # must have an A record pointing to the droplet IP
 acme_email          = "you@example.com"    # Let's Encrypt expiry notifications
-traefik_version     = "v3.2.11"

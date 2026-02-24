@@ -87,6 +87,10 @@ export default function Applications() {
       const parsed = JSON.parse(a.ports) as string[]
       if (parsed.length > 0) ports = parsed
     } catch { /* keep default */ }
+    let dbs: string[] = []
+    try {
+      dbs = JSON.parse(a.databases) as string[]
+    } catch { /* keep default */ }
     setForm({
       name: a.name,
       docker_image: a.docker_image,
@@ -95,6 +99,7 @@ export default function Applications() {
       domain: a.domain || '',
       envPairs,
       ports,
+      databases: dbs,
     })
     setEditingId(a.id)
     setShowCreate(true)
