@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +11,15 @@ import (
 	"github.com/gsarma/localisprod-v2/internal/sshexec"
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
+
+// localHosts contains addresses that resolve to the local machine.
+// Non-root users are blocked from registering nodes with these hosts.
+var localHosts = map[string]bool{
+	"localhost": true,
+	"127.0.0.1": true,
+	"::1":       true,
+	"0.0.0.0":   true,
+}
 
 type NodeHandler struct {
 	store *store.Store
@@ -37,6 +47,10 @@ func (h *NodeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Name == "" || body.Host == "" || body.Username == "" || body.PrivateKey == "" {
 		writeError(w, http.StatusBadRequest, "name, host, username, and private_key are required")
+		return
+	}
+	if localHosts[strings.ToLower(body.Host)] && !isRoot(r) {
+		writeError(w, http.StatusForbidden, "only the root user can register local addresses as nodes; use the management node instead")
 		return
 	}
 	if body.Port == 0 {
@@ -70,6 +84,12 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if isRoot(r) {
+		if mgmt, err := h.store.GetManagementNode(); err == nil && mgmt != nil {
+			mgmt.PrivateKey = ""
+			nodes = append([]*models.Node{mgmt}, nodes...)
+		}
+	}
 	for _, n := range nodes {
 		n.PrivateKey = ""
 	}
@@ -84,7 +104,7 @@ func (h *NodeHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
 	if userID == "" {
 		return
 	}
-	node, err := h.store.GetNode(id, userID)
+	node, err := h.store.GetNodeForUser(id, userID, isRoot(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -100,6 +120,10 @@ func (h *NodeHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
 func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request, id string) {
 	userID := getUserID(w, r)
 	if userID == "" {
+		return
+	}
+	if id == "management" {
+		writeError(w, http.StatusForbidden, "the management node cannot be deleted")
 		return
 	}
 	node, err := h.store.GetNode(id, userID)
@@ -123,7 +147,7 @@ func (h *NodeHandler) SetupTraefik(w http.ResponseWriter, r *http.Request, id st
 	if userID == "" {
 		return
 	}
-	node, err := h.store.GetNode(id, userID)
+	node, err := h.store.GetNodeForUser(id, userID, isRoot(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -156,7 +180,7 @@ func (h *NodeHandler) Ping(w http.ResponseWriter, r *http.Request, id string) {
 	if userID == "" {
 		return
 	}
-	node, err := h.store.GetNode(id, userID)
+	node, err := h.store.GetNodeForUser(id, userID, isRoot(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

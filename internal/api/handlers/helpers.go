@@ -25,3 +25,8 @@ func getUserID(w http.ResponseWriter, r *http.Request) string {
 	}
 	return claims.UserID
 }
+
+func isRoot(r *http.Request) bool {
+	claims := auth.ClaimsFromContext(r.Context())
+	return claims != nil && claims.IsRoot
+}

@@ -81,9 +81,13 @@ func (h *DatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		dbuser = body.Name
 	}
 
-	node, err := h.store.GetNode(body.NodeID, userID)
+	node, err := h.store.GetNodeForUser(body.NodeID, userID, isRoot(r))
 	if err != nil || node == nil {
 		writeError(w, http.StatusNotFound, "node not found")
+		return
+	}
+	if node.IsLocal && !isRoot(r) {
+		writeError(w, http.StatusForbidden, "only the root user can create databases on the management node")
 		return
 	}
 
@@ -225,7 +229,7 @@ func (h *DatabaseHandler) Delete(w http.ResponseWriter, r *http.Request, id stri
 		return
 	}
 
-	node, err := h.store.GetNode(db.NodeID, userID)
+	node, err := h.store.GetNodeForUser(db.NodeID, userID, isRoot(r))
 	if err == nil && node != nil {
 		_, _ = sshexec.NewRunner(node).Run(sshexec.DockerStopRemoveCmd(db.ContainerName))
 	}

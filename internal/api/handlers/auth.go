@@ -9,14 +9,15 @@ import (
 )
 
 type AuthHandler struct {
-	store  *store.Store
-	oauth  *auth.OAuthService
-	jwt    *auth.JWTService
-	appURL string
+	store     *store.Store
+	oauth     *auth.OAuthService
+	jwt       *auth.JWTService
+	appURL    string
+	rootEmail string
 }
 
-func NewAuthHandler(s *store.Store, oauth *auth.OAuthService, jwt *auth.JWTService, appURL string) *AuthHandler {
-	return &AuthHandler{store: s, oauth: oauth, jwt: jwt, appURL: appURL}
+func NewAuthHandler(s *store.Store, oauth *auth.OAuthService, jwt *auth.JWTService, appURL, rootEmail string) *AuthHandler {
+	return &AuthHandler{store: s, oauth: oauth, jwt: jwt, appURL: appURL, rootEmail: rootEmail}
 }
 
 func (h *AuthHandler) GoogleLogin(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +71,8 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenStr, err := h.jwt.Issue(user.ID, user.Email, user.Name, user.AvatarURL)
+	isRoot := h.rootEmail != "" && user.Email == h.rootEmail
+	tokenStr, err := h.jwt.Issue(user.ID, user.Email, user.Name, user.AvatarURL, isRoot)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to issue token")
 		return
@@ -105,10 +107,11 @@ func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"id":         claims.UserID,
 		"email":      claims.Email,
 		"name":       claims.Name,
 		"avatar_url": claims.AvatarURL,
+		"is_root":    claims.IsRoot,
 	})
 }

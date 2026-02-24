@@ -45,9 +45,13 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	node, err := h.store.GetNode(body.NodeID, userID)
+	node, err := h.store.GetNodeForUser(body.NodeID, userID, isRoot(r))
 	if err != nil || node == nil {
 		writeError(w, http.StatusNotFound, "node not found")
+		return
+	}
+	if node.IsLocal && !isRoot(r) {
+		writeError(w, http.StatusForbidden, "only the root user can deploy to the management node")
 		return
 	}
 
@@ -238,7 +242,7 @@ func (h *DeploymentHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 		return
 	}
 
-	node, err := h.store.GetNode(d.NodeID, userID)
+	node, err := h.store.GetNodeForUser(d.NodeID, userID, isRoot(r))
 	if err == nil && node != nil {
 		cmd := sshexec.DockerStopRemoveCmd(d.ContainerName)
 		_, _ = sshexec.NewRunner(node).Run(cmd)
@@ -262,7 +266,7 @@ func (h *DeploymentHandler) Restart(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 
-	node, err := h.store.GetNode(d.NodeID, userID)
+	node, err := h.store.GetNodeForUser(d.NodeID, userID, isRoot(r))
 	if err != nil || node == nil {
 		writeError(w, http.StatusNotFound, "node not found")
 		return
@@ -298,7 +302,7 @@ func (h *DeploymentHandler) Logs(w http.ResponseWriter, r *http.Request, id stri
 		return
 	}
 
-	node, err := h.store.GetNode(d.NodeID, userID)
+	node, err := h.store.GetNodeForUser(d.NodeID, userID, isRoot(r))
 	if err != nil || node == nil {
 		writeError(w, http.StatusNotFound, "node not found")
 		return

@@ -33,6 +33,25 @@ func withUserID(r *http.Request) *http.Request {
 	return r.WithContext(ctx)
 }
 
+// withRootUserID injects fake root JWT claims into the request context.
+func withRootUserID(r *http.Request) *http.Request {
+	claims := &auth.Claims{UserID: testUserID, Email: "root@example.com", Name: "Root User", IsRoot: true}
+	ctx := auth.InjectClaims(r.Context(), claims)
+	return r.WithContext(ctx)
+}
+
+// postJSONAsRoot creates a POST request with a JSON body, with root auth claims injected.
+func postJSONAsRoot(t *testing.T, path string, body any) *http.Request {
+	t.Helper()
+	b, err := json.Marshal(body)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	r := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(b))
+	r.Header.Set("Content-Type", "application/json")
+	return withRootUserID(r)
+}
+
 // postJSON creates a POST request with a JSON body, with auth claims injected.
 func postJSON(t *testing.T, path string, body any) *http.Request {
 	t.Helper()
