@@ -18,6 +18,7 @@ export default function Applications() {
   const [form, setForm] = useState<{
     name: string
     docker_image: string
+    dockerfile_path: string
     command: string
     github_repo: string
     domain: string
@@ -25,14 +26,14 @@ export default function Applications() {
     ports: string[]
     databases: string[]
   }>({
-    name: '', docker_image: '', command: '', github_repo: '', domain: '',
+    name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '',
     envPairs: [{ key: '', value: '' }],
     ports: [''],
     databases: [],
   })
 
   const resetForm = () =>
-    setForm({ name: '', docker_image: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [] })
+    setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [] })
 
   const load = () =>
     applications.list().then(setAppList).catch(e => setError(e.message))
@@ -52,6 +53,7 @@ export default function Applications() {
       const data: CreateApplicationInput = {
         name: form.name,
         docker_image: form.docker_image,
+        dockerfile_path: form.dockerfile_path || undefined,
         command: form.command,
         env_vars: envVars,
         ports: form.ports.filter(Boolean),
@@ -94,6 +96,7 @@ export default function Applications() {
     setForm({
       name: a.name,
       docker_image: a.docker_image,
+      dockerfile_path: a.dockerfile_path || '',
       command: a.command || '',
       github_repo: a.github_repo || '',
       domain: a.domain || '',
@@ -145,6 +148,7 @@ export default function Applications() {
     setForm({
       name: repo.name,
       docker_image: `ghcr.io/${repo.full_name}:latest`,
+      dockerfile_path: '',
       command: '',
       github_repo: repo.full_name,
       domain: '',
@@ -312,6 +316,15 @@ export default function Applications() {
                 value={form.docker_image}
                 onChange={e => setForm(prev => ({ ...prev, docker_image: e.target.value }))}
                 placeholder="nginx:latest"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Dockerfile Path (optional)</label>
+              <input
+                className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+                value={form.dockerfile_path}
+                onChange={e => setForm(prev => ({ ...prev, dockerfile_path: e.target.value }))}
+                placeholder="./Dockerfile"
               />
             </div>
             <div>
