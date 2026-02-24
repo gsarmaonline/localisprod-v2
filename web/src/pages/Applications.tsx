@@ -32,8 +32,31 @@ export default function Applications() {
     databases: [],
   })
 
-  const resetForm = () =>
+  const [showEnvPaste, setShowEnvPaste] = useState(false)
+  const [envPasteText, setEnvPasteText] = useState('')
+
+  const resetForm = () => {
     setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [] })
+    setShowEnvPaste(false)
+    setEnvPasteText('')
+  }
+
+  const applyEnvPaste = () => {
+    const pairs = envPasteText
+      .split('\n')
+      .filter(line => line.trim() && !line.trim().startsWith('#'))
+      .map(line => {
+        const idx = line.indexOf('=')
+        if (idx === -1) return null
+        return { key: line.slice(0, idx).trim(), value: line.slice(idx + 1).trim() }
+      })
+      .filter((p): p is { key: string; value: string } => p !== null && p.key !== '')
+    if (pairs.length > 0) {
+      setForm(prev => ({ ...prev, envPairs: pairs }))
+      setShowEnvPaste(false)
+      setEnvPasteText('')
+    }
+  }
 
   const load = () =>
     applications.list().then(setAppList).catch(e => setError(e.message))
@@ -374,7 +397,34 @@ export default function Applications() {
 
             {/* Env Vars */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Environment Variables</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Environment Variables</label>
+                <button
+                  type="button"
+                  onClick={() => { setShowEnvPaste(v => !v); setEnvPasteText('') }}
+                  className="text-xs text-purple-600 hover:underline"
+                >
+                  {showEnvPaste ? 'Cancel paste' : 'Paste .env'}
+                </button>
+              </div>
+              {showEnvPaste && (
+                <div className="mb-2">
+                  <textarea
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y"
+                    rows={6}
+                    placeholder={"KEY=value\nANOTHER_KEY=another_value"}
+                    value={envPasteText}
+                    onChange={e => setEnvPasteText(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    onClick={applyEnvPaste}
+                    className="mt-1 px-3 py-1.5 bg-purple-600 text-white text-xs rounded-lg hover:bg-purple-700"
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
               {form.envPairs.map((pair, i) => (
                 <div key={i} className="flex gap-2 mb-1">
                   <input
