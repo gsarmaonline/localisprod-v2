@@ -90,6 +90,7 @@ Can be set in a `.env` file at the project root or as real environment variables
 | `PORT`                 | `8080`                         | HTTP server port |
 | `DB_PATH`              | `cluster.db`                   | Path to SQLite database |
 | `SECRET_KEY`           | *(unset)*                      | Base64-encoded 32-byte key for AES-256-GCM encryption of env vars. Generate: `openssl rand -base64 32` |
+| `ROOT_EMAIL`           | *(unset)*                      | Google account email of the root user. The root user can access the management node (the host machine) and register local addresses as nodes. Without this, no user has root access. |
 | `POLL_INTERVAL`        | `5m`                           | How often the background poller checks for newer Docker images and redeploys (Go duration, e.g. `2m`, `10m`) |
 | `STATUS_POLL_INTERVAL` | `1m`                           | How often nodes are pinged and containers are health-checked to reconcile status in the database |
 

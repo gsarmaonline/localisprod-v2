@@ -9,7 +9,7 @@ import (
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
 
-func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTService, appURL string) http.Handler {
+func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTService, appURL, rootEmail string) http.Handler {
 	nodeH := handlers.NewNodeHandler(s)
 	appH := handlers.NewApplicationHandler(s)
 	depH := handlers.NewDeploymentHandler(s)
@@ -18,7 +18,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	settingsH := handlers.NewSettingsHandler(s, appURL)
 	githubH := handlers.NewGithubHandler(s)
 	webhookH := handlers.NewWebhookHandler(s)
-	authH := handlers.NewAuthHandler(s, oauthSvc, jwtSvc, appURL)
+	authH := handlers.NewAuthHandler(s, oauthSvc, jwtSvc, appURL, rootEmail)
 
 	// Unprotected mux (auth + webhooks)
 	publicMux := http.NewServeMux()

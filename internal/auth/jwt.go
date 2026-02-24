@@ -13,6 +13,7 @@ type Claims struct {
 	Email     string `json:"email"`
 	Name      string `json:"name"`
 	AvatarURL string `json:"avatar_url"`
+	IsRoot    bool   `json:"is_root"`
 	jwt.RegisteredClaims
 }
 
@@ -24,12 +25,13 @@ func NewJWTService(secret string) *JWTService {
 	return &JWTService{secret: []byte(secret)}
 }
 
-func (j *JWTService) Issue(userID, email, name, avatarURL string) (string, error) {
+func (j *JWTService) Issue(userID, email, name, avatarURL string, isRoot bool) (string, error) {
 	claims := Claims{
 		UserID:    userID,
 		Email:     email,
 		Name:      name,
 		AvatarURL: avatarURL,
+		IsRoot:    isRoot,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

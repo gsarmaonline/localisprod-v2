@@ -59,6 +59,15 @@ func main() {
 		log.Fatalf("failed to open store: %v", err)
 	}
 
+	rootEmail := os.Getenv("ROOT_EMAIL")
+	if rootEmail == "" {
+		log.Println("WARNING: ROOT_EMAIL is not set; no user will have root access")
+	}
+
+	if err := s.EnsureManagementNode(); err != nil {
+		log.Fatalf("failed to ensure management node: %v", err)
+	}
+
 	pollInterval := 5 * time.Minute
 	if v := os.Getenv("POLL_INTERVAL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {
@@ -85,7 +94,7 @@ func main() {
 	}
 	oauthSvc := auth.NewOAuthService(googleClientID, googleClientSecret, appURL)
 
-	router := api.NewRouter(s, oauthSvc, jwtSvc, appURL)
+	router := api.NewRouter(s, oauthSvc, jwtSvc, appURL, rootEmail)
 
 	mux := http.NewServeMux()
 

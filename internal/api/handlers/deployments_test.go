@@ -80,13 +80,11 @@ func TestDeploymentCreate_NodeNotFound(t *testing.T) {
 	}
 }
 
-func TestDeploymentCreate_LocalNode_DockerNotAvailable(t *testing.T) {
-	// This test exercises the happy path through validation and deployment record creation.
-	// The docker run command will likely fail in CI (no Docker daemon), so we expect
-	// a 200 with error details (the handler returns 200 even on docker failures).
+func TestDeploymentCreate_LocalNode_NonRoot_Forbidden(t *testing.T) {
+	// Non-root users must not be able to deploy to a local (management) node.
 	s := newTestStore(t)
 	h := handlers.NewDeploymentHandler(s)
-	n := mustCreateNode(t, s) // IsLocal=true
+	n := mustCreateNode(t, s) // IsLocal=true, owned by testUserID
 	a := mustCreateApp(t, s)
 
 	rec := httptest.NewRecorder()
@@ -96,7 +94,26 @@ func TestDeploymentCreate_LocalNode_DockerNotAvailable(t *testing.T) {
 	})
 	h.Create(rec, r)
 
-	// Either 201 (docker succeeded) or 200 with error (docker failed).
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d (body: %s)", rec.Code, rec.Body)
+	}
+}
+
+func TestDeploymentCreate_LocalNode_RootUser_DockerNotAvailable(t *testing.T) {
+	// Root users can deploy to local nodes. Docker will likely fail in CI so we
+	// accept 200 (docker error details) or 201 (success).
+	s := newTestStore(t)
+	h := handlers.NewDeploymentHandler(s)
+	n := mustCreateNode(t, s) // IsLocal=true
+	a := mustCreateApp(t, s)
+
+	rec := httptest.NewRecorder()
+	r := postJSONAsRoot(t, "/api/deployments", map[string]any{
+		"application_id": a.ID,
+		"node_id":        n.ID,
+	})
+	h.Create(rec, r)
+
 	if rec.Code != http.StatusCreated && rec.Code != http.StatusOK {
 		t.Errorf("expected 200 or 201, got %d (body: %s)", rec.Code, rec.Body)
 	}

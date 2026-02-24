@@ -264,6 +264,45 @@ func (s *Store) GetNode(id, userID string) (*models.Node, error) {
 	return n, err
 }
 
+// EnsureManagementNode creates the local management node if it does not exist.
+// The management node is system-owned (user_id IS NULL) and only accessible to root users.
+func (s *Store) EnsureManagementNode() error {
+	_, err := s.db.Exec(`
+		INSERT OR IGNORE INTO nodes (id, name, host, port, username, private_key, status, is_local, traefik_enabled, user_id, created_at)
+		VALUES ('management', 'Management Node', '127.0.0.1', 0, '', '', 'online', 1, 0, NULL, CURRENT_TIMESTAMP)
+	`)
+	return err
+}
+
+// GetManagementNode returns the management node, or nil if not found.
+func (s *Store) GetManagementNode() (*models.Node, error) {
+	n := &models.Node{}
+	err := s.db.QueryRow(
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		 FROM nodes WHERE id = 'management' AND is_local = 1 AND user_id IS NULL`,
+	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return n, err
+}
+
+// GetNodeForUser returns a node by ID. Root users can also access the management node.
+func (s *Store) GetNodeForUser(id, userID string, isRoot bool) (*models.Node, error) {
+	if !isRoot {
+		return s.GetNode(id, userID)
+	}
+	n := &models.Node{}
+	err := s.db.QueryRow(
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		 FROM nodes WHERE id = ? AND (user_id = ? OR (id = 'management' AND user_id IS NULL))`, id, userID,
+	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return n, err
+}
+
 // ListAllNodes returns every node across all users. Used by the background poller.
 func (s *Store) ListAllNodes() ([]*models.Node, error) {
 	rows, err := s.db.Query(
