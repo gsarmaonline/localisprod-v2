@@ -24,14 +24,15 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name        string            `json:"name"`
-		DockerImage string            `json:"docker_image"`
-		EnvVars     map[string]string `json:"env_vars"`
-		Ports       []string          `json:"ports"`
-		Command     string            `json:"command"`
-		GithubRepo  string            `json:"github_repo"`
-		Domain      string            `json:"domain"`
-		Databases   []string          `json:"databases"`
+		Name           string            `json:"name"`
+		DockerImage    string            `json:"docker_image"`
+		DockerfilePath string            `json:"dockerfile_path"`
+		EnvVars        map[string]string `json:"env_vars"`
+		Ports          []string          `json:"ports"`
+		Command        string            `json:"command"`
+		GithubRepo     string            `json:"github_repo"`
+		Domain         string            `json:"domain"`
+		Databases      []string          `json:"databases"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -56,16 +57,17 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	app := &models.Application{
-		ID:          uuid.New().String(),
-		Name:        body.Name,
-		DockerImage: body.DockerImage,
-		EnvVars:     string(envJSON),
-		Ports:       string(portsJSON),
-		Command:     body.Command,
-		GithubRepo:  body.GithubRepo,
-		Domain:      body.Domain,
-		Databases:   string(dbsJSON),
-		CreatedAt:   time.Now().UTC(),
+		ID:             uuid.New().String(),
+		Name:           body.Name,
+		DockerImage:    body.DockerImage,
+		DockerfilePath: body.DockerfilePath,
+		EnvVars:        string(envJSON),
+		Ports:          string(portsJSON),
+		Command:        body.Command,
+		GithubRepo:     body.GithubRepo,
+		Domain:         body.Domain,
+		Databases:      string(dbsJSON),
+		CreatedAt:      time.Now().UTC(),
 	}
 	if err := h.store.CreateApplication(app, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -118,12 +120,13 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	var body struct {
-		Name        string            `json:"name"`
-		DockerImage string            `json:"docker_image"`
-		EnvVars     map[string]string `json:"env_vars"`
-		Ports       []string          `json:"ports"`
-		Command     string            `json:"command"`
-		Domain      string            `json:"domain"`
+		Name           string            `json:"name"`
+		DockerImage    string            `json:"docker_image"`
+		DockerfilePath string            `json:"dockerfile_path"`
+		EnvVars        map[string]string `json:"env_vars"`
+		Ports          []string          `json:"ports"`
+		Command        string            `json:"command"`
+		Domain         string            `json:"domain"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -143,6 +146,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	}
 	existing.Name = body.Name
 	existing.DockerImage = body.DockerImage
+	existing.DockerfilePath = body.DockerfilePath
 	existing.EnvVars = string(envJSON)
 	existing.Ports = string(portsJSON)
 	existing.Command = body.Command

@@ -69,6 +69,7 @@ export interface Application {
   id: string
   name: string
   docker_image: string
+  dockerfile_path: string
   env_vars: string  // JSON string
   ports: string     // JSON string
   command: string
@@ -81,6 +82,7 @@ export interface Application {
 export interface CreateApplicationInput {
   name: string
   docker_image: string
+  dockerfile_path?: string
   env_vars: Record<string, string>
   ports: string[]
   command: string
