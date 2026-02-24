@@ -1,4 +1,4 @@
-.PHONY: dev dev-backend dev-frontend build build-frontend build-backend run clean
+.PHONY: dev dev-backend dev-frontend build build-frontend build-backend run clean test-prod auth-prod auth-prod-ssh
 
 # Run both backend and frontend dev servers concurrently
 dev:
@@ -29,3 +29,13 @@ run: build
 
 clean:
 	rm -rf bin/ web/dist/
+
+# Production tests
+auth-prod: ## Interactive browser login → saves session cookie to tests/.session
+	cd tests && npm run auth
+
+auth-prod-ssh: ## SSH-based token minting (no browser) → saves session to tests/.session
+	cd tests && npm run auth:ssh
+
+test-prod: ## Run full production API test suite (requires auth first)
+	cd tests && npm test

@@ -1,0 +1,22 @@
+{
+  "name": "localisprod-prod-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "auth": "tsx auth/login.ts",
+    "auth:ssh": "tsx auth/mint-token.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "dotenv": "^16.4.0",
+    "playwright": "^1.49.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "jsonwebtoken": "^9.0.3"
+  }
+}
