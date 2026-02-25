@@ -254,7 +254,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Image:         app.DockerImage,
 		Ports:         ports,
 		EnvFilePath:   envFilePath,
-		CommandArgs:   strings.Fields(app.Command),
+		CommandArgs:   shellFields(app.Command),
 	}
 
 	if app.Domain != "" {
