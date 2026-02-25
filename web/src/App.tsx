@@ -5,12 +5,13 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faGaugeHigh, faServer, faBoxOpen, faBolt, faGear,
-  faBars, faXmark, faDatabase,
+  faBars, faXmark, faDatabase, faMemory,
 } from '@fortawesome/free-solid-svg-icons'
 import Dashboard from './pages/Dashboard'
 import Nodes from './pages/Nodes'
 import Applications from './pages/Applications'
 import Databases from './pages/Databases'
+import Caches from './pages/Caches'
 import Deployments from './pages/Deployments'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
@@ -20,6 +21,7 @@ const navItems = [
   { to: '/nodes', label: 'Nodes', icon: faServer },
   { to: '/applications', label: 'Applications', icon: faBoxOpen },
   { to: '/databases', label: 'Databases', icon: faDatabase },
+  { to: '/caches', label: 'Cache', icon: faMemory },
   { to: '/deployments', label: 'Deployments', icon: faBolt },
   { to: '/settings', label: 'Settings', icon: faGear },
 ]
@@ -105,6 +107,7 @@ function AppLayout() {
             <Route path="/nodes" element={<Nodes />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/databases" element={<Databases />} />
+            <Route path="/caches" element={<Caches />} />
             <Route path="/deployments" element={<Deployments />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

@@ -102,6 +102,29 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Inject cache connection URLs from linked caches
+	var cacheIDs []string
+	_ = json.Unmarshal([]byte(app.Caches), &cacheIDs)
+	for _, cID := range cacheIDs {
+		c, err := h.store.GetCache(cID, userID)
+		if err != nil || c == nil {
+			continue
+		}
+		if envVars == nil {
+			envVars = map[string]string{}
+		}
+		envVars[CacheEnvVarName(c.Name)] = CacheConnectionURL(c)
+	}
+	// For single-cache apps, also inject CACHE_URL as a convenience alias.
+	if len(cacheIDs) == 1 {
+		if _, exists := envVars["CACHE_URL"]; !exists {
+			c, err := h.store.GetCache(cacheIDs[0], userID)
+			if err == nil && c != nil {
+				envVars["CACHE_URL"] = CacheConnectionURL(c)
+			}
+		}
+	}
+
 	runner := sshexec.NewRunner(node)
 
 	// If image is from ghcr.io, authenticate first
