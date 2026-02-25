@@ -1,9 +1,9 @@
 export default function Login() {
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow-sm border p-8 w-full max-w-sm text-center">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Localisprod</h1>
-        <p className="text-sm text-gray-500 mb-8">Cluster Manager</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex items-center justify-center">
+      <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-xl border border-white/20 p-8 w-full max-w-sm text-center">
+        <h1 className="text-xl font-semibold text-gray-900 mb-1 tracking-tight">Localisprod</h1>
+        <p className="text-sm text-gray-400 mb-8">Cluster Manager</p>
         <a
           href="/api/auth/google"
           className="flex items-center justify-center gap-3 w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"

@@ -35,7 +35,7 @@ function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 flex">
       {/* Mobile backdrop */}
       {sidebarOpen && (
         <div
@@ -45,11 +45,11 @@ function AppLayout() {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-56 bg-gray-900 text-white flex flex-col transition-transform duration-200 md:relative md:translate-x-0 md:z-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="px-4 py-5 border-b border-gray-700 flex items-center justify-between">
+      <aside className={`fixed inset-y-0 left-0 z-40 w-56 bg-gradient-to-b from-slate-900 to-slate-800 text-white flex flex-col transition-transform duration-200 md:relative md:translate-x-0 md:z-auto ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="px-4 py-5 border-b border-white/10 flex items-center justify-between">
           <div>
-            <h1 className="font-bold text-base tracking-tight">Localisprod</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Cluster Manager</p>
+            <h1 className="font-semibold text-base tracking-tight bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Localisprod</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Cluster Manager</p>
           </div>
           <button
             className="md:hidden text-gray-400 hover:text-white p-1"
@@ -67,10 +67,10 @@ function AppLayout() {
               end={item.to === '/'}
               onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
                   isActive
-                    ? 'bg-gray-700 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                    ? 'bg-gradient-to-r from-indigo-500/25 to-indigo-500/10 text-white font-medium'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`
               }
             >
@@ -80,11 +80,11 @@ function AppLayout() {
           ))}
         </nav>
         {user && (
-          <div className="px-4 py-4 border-t border-gray-700">
-            <p className="text-xs text-gray-400 truncate mb-2">{user.email}</p>
+          <div className="px-4 py-4 border-t border-white/10">
+            <p className="text-xs text-slate-400 truncate mb-2">{user.email}</p>
             <button
               onClick={logout}
-              className="text-xs text-gray-400 hover:text-white transition-colors"
+              className="text-xs text-slate-400 hover:text-white transition-colors"
             >
               Sign out
             </button>
@@ -95,7 +95,7 @@ function AppLayout() {
       {/* Main content */}
       <main className="flex-1 overflow-auto min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center px-4 py-3 bg-gray-900 text-white">
+        <div className="md:hidden flex items-center px-4 py-3 bg-gradient-to-r from-slate-900 to-slate-800 text-white">
           <button
             onClick={() => setSidebarOpen(true)}
             className="text-gray-400 hover:text-white mr-3"
