@@ -9,7 +9,7 @@ A cluster management system for deploying Docker containers to SSH-accessible no
 - Define applications (Docker image, env vars, port mappings, command, linked databases/caches/Kafka clusters/monitoring stacks)
 - Provision managed **databases** (Postgres) on nodes — connection URLs auto-injected into linked app deployments
 - Provision managed **caches** (Redis) on nodes — connection URLs auto-injected into linked app deployments
-- Provision managed **Kafka** clusters (single-node KRaft, via `bitnami/kafka`) on nodes — bootstrap server addresses auto-injected into linked app deployments
+- Provision managed **Kafka** clusters (single-node KRaft, via `apache/kafka`) on nodes — bootstrap server addresses auto-injected into linked app deployments
 - Provision managed **monitoring stacks** (Prometheus + Grafana) on nodes — Prometheus and Grafana URLs auto-injected into linked app deployments; Grafana is pre-configured with Prometheus as the default datasource
 - Deploy applications as Docker containers onto nodes via SSH
 - View container logs, restart or stop deployments
@@ -105,6 +105,23 @@ GOOGLE_CLIENT_SECRET="GOCSPX-your-secret"
 APP_URL="http://localhost:8080"
 SECRET_KEY="<openssl rand -base64 32>"
 ```
+
+## Integration Tests
+
+Docker-based integration tests exercise the full stack against real containers (Postgres, Redis, Kafka, nginx, and a sample app deployment).
+
+```bash
+# Requires: Docker daemon running, no other setup needed
+make test-integration
+```
+
+The suite:
+- Starts a real in-process HTTP server on a random port
+- Inserts a local node (uses `docker` directly, no SSH needed)
+- Mints a JWT so auth middleware is fully exercised
+- Provisions and tears down real Docker containers per test
+
+Tests cover: Postgres CRUD, Redis ping/SET/GET, Kafka KRaft broker startup, nginx deployment logs/restart, and a full sample-app wiring test that verifies injected `DATABASE_URL` / `CACHE_URL` / `KAFKA_BROKERS` env vars and runs actual `psql` + `redis-cli` queries from inside the app container.
 
 ## API
 

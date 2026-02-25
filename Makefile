@@ -1,4 +1,4 @@
-.PHONY: dev dev-backend dev-frontend build build-frontend build-backend run clean test-prod auth-prod auth-prod-ssh
+.PHONY: dev dev-backend dev-frontend build build-frontend build-backend run clean test-prod auth-prod auth-prod-ssh test-integration
 
 # Run both backend and frontend dev servers concurrently
 dev:
@@ -39,3 +39,6 @@ auth-prod-ssh: ## SSH-based token minting (no browser) → saves session to test
 
 test-prod: ## Run full production API test suite (requires auth first)
 	cd tests && npm test
+
+test-integration: ## Run Docker integration tests (requires docker daemon)
+	go test -v -tags integration -timeout 20m ./tests/integration/...
