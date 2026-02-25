@@ -3,9 +3,9 @@ import { databases, nodes, Database, CreateDatabaseInput, Node } from '../api/cl
 import Modal from '../components/Modal'
 import StatusBadge from '../components/StatusBadge'
 
-const DB_TYPES = ['postgres', 'mysql', 'redis', 'mongodb'] as const
+const DB_TYPES = ['postgres', 'redis'] as const
 const DEFAULT_VERSIONS: Record<string, string> = {
-  postgres: '16', mysql: '8', redis: '7', mongodb: '7',
+  postgres: '16', redis: '7',
 }
 
 export default function Databases() {
@@ -76,9 +76,7 @@ export default function Databases() {
 
   const typeColor: Record<string, string> = {
     postgres: 'bg-blue-100 text-blue-700',
-    mysql:    'bg-orange-100 text-orange-700',
     redis:    'bg-red-100 text-red-700',
-    mongodb:  'bg-green-100 text-green-700',
   }
 
   return (
@@ -255,7 +253,7 @@ export default function Databases() {
                   className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   value={form.port}
                   onChange={e => setForm(prev => ({ ...prev, port: e.target.value }))}
-                  placeholder={{ postgres: '5432', mysql: '3306', redis: '6379', mongodb: '27017' }[form.type]}
+                  placeholder={{ postgres: '5432', redis: '6379' }[form.type]}
                 />
               </div>
             </div>
