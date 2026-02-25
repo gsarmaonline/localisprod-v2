@@ -256,13 +256,14 @@ export default function Applications() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Ports</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Domain</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Command</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Last Deploy</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {appList.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No applications yet</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No applications yet</td>
               </tr>
             )}
             {appList.map(a => (
@@ -287,6 +288,7 @@ export default function Applications() {
                 </td>
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.domain || '—'}</td>
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.command || '—'}</td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{a.last_deployed_at ? new Date(a.last_deployed_at).toLocaleString() : '—'}</td>
                 <td className="px-4 py-3 flex gap-2">
                   <button
                     onClick={() => handleEdit(a)}

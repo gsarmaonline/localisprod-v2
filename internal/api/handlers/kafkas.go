@@ -149,8 +149,11 @@ func (h *KafkaHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now().UTC()
 	_ = h.store.UpdateKafkaStatus(k.ID, userID, "running")
+	_ = h.store.UpdateKafkaLastDeployedAt(k.ID, userID, now)
 	k.Status = "running"
+	k.LastDeployedAt = &now
 	writeJSON(w, http.StatusCreated, k)
 }
 

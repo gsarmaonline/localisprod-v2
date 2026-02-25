@@ -61,6 +61,13 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE nodes        ADD COLUMN user_id TEXT REFERENCES users(id)`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN user_id TEXT REFERENCES users(id)`)
 	_, _ = s.db.Exec(`ALTER TABLE deployments  ADD COLUMN user_id TEXT REFERENCES users(id)`)
+	// last_deployed_at timestamps
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE deployments  ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE databases    ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE caches       ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE kafkas       ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE monitorings  ADD COLUMN last_deployed_at DATETIME`)
 
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -111,7 +118,8 @@ CREATE TABLE IF NOT EXISTS applications (
   kafkas TEXT NOT NULL DEFAULT '[]',
   monitorings TEXT NOT NULL DEFAULT '[]',
   user_id TEXT REFERENCES users(id),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_deployed_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS databases (
@@ -127,7 +135,8 @@ CREATE TABLE IF NOT EXISTS databases (
   container_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_deployed_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS caches (
@@ -140,7 +149,8 @@ CREATE TABLE IF NOT EXISTS caches (
   container_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_deployed_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS kafkas (
@@ -152,7 +162,8 @@ CREATE TABLE IF NOT EXISTS kafkas (
   container_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_deployed_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS monitorings (
@@ -166,7 +177,8 @@ CREATE TABLE IF NOT EXISTS monitorings (
   grafana_container_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_deployed_at DATETIME
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_applications_user_name ON applications(user_id, name);
@@ -179,7 +191,8 @@ CREATE TABLE IF NOT EXISTS deployments (
   container_id TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_deployed_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -410,7 +423,7 @@ func (s *Store) CreateApplication(a *models.Application, userID string) error {
 
 func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
 		 FROM applications WHERE user_id = ? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -419,7 +432,7 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -433,9 +446,9 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
 		 FROM applications WHERE id = ? AND user_id = ?`, id, userID,
-	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -468,7 +481,7 @@ func (s *Store) DeleteApplication(id, userID string) error {
 
 func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
 		 FROM applications WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
 	if err != nil {
 		return nil, err
@@ -477,7 +490,7 @@ func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*mod
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -501,7 +514,7 @@ func (s *Store) CreateDeployment(d *models.Deployment, userID string) error {
 
 func (s *Store) ListDeployments(userID string) ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
+		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
 		JOIN applications a ON d.application_id = a.id
@@ -516,7 +529,7 @@ func (s *Store) ListDeployments(userID string) ([]*models.Deployment, error) {
 	var deployments []*models.Deployment
 	for rows.Next() {
 		d := &models.Deployment{}
-		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
+		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
 			return nil, err
 		}
 		deployments = append(deployments, d)
@@ -527,13 +540,13 @@ func (s *Store) ListDeployments(userID string) ([]*models.Deployment, error) {
 func (s *Store) GetDeployment(id, userID string) (*models.Deployment, error) {
 	d := &models.Deployment{}
 	err := s.db.QueryRow(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
+		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
 		JOIN applications a ON d.application_id = a.id
 		JOIN nodes n ON d.node_id = n.id
 		WHERE d.id = ? AND d.user_id = ?
-	`, id, userID).Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage)
+	`, id, userID).Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -542,7 +555,7 @@ func (s *Store) GetDeployment(id, userID string) (*models.Deployment, error) {
 
 func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
+		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
 		JOIN applications a ON d.application_id = a.id
@@ -557,7 +570,7 @@ func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.D
 	var deployments []*models.Deployment
 	for rows.Next() {
 		d := &models.Deployment{}
-		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
+		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
 			return nil, err
 		}
 		deployments = append(deployments, d)
@@ -569,7 +582,7 @@ func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.D
 // Used by the background poller to check for new images.
 func (s *Store) ListAllRunningDeployments() ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at,
+		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image, d.user_id
 		FROM deployments d
 		JOIN applications a ON d.application_id = a.id
@@ -583,7 +596,7 @@ func (s *Store) ListAllRunningDeployments() ([]*models.Deployment, error) {
 	var deployments []*models.Deployment
 	for rows.Next() {
 		d := &models.Deployment{}
-		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.AppName, &d.NodeName, &d.DockerImage, &d.UserID); err != nil {
+		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage, &d.UserID); err != nil {
 			return nil, err
 		}
 		deployments = append(deployments, d)
@@ -593,6 +606,16 @@ func (s *Store) ListAllRunningDeployments() ([]*models.Deployment, error) {
 
 func (s *Store) UpdateDeploymentStatus(id, userID, status, containerID string) error {
 	_, err := s.db.Exec(`UPDATE deployments SET status = ?, container_id = ? WHERE id = ? AND user_id = ?`, status, containerID, id, userID)
+	return err
+}
+
+func (s *Store) UpdateDeploymentLastDeployedAt(id, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE deployments SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, id, userID)
+	return err
+}
+
+func (s *Store) UpdateApplicationLastDeployedAt(appID, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE applications SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, appID, userID)
 	return err
 }
 
@@ -649,7 +672,7 @@ func (s *Store) CreateDatabase(d *models.Database, userID string) error {
 func (s *Store) ListDatabases(userID string) ([]*models.Database, error) {
 	rows, err := s.db.Query(`
 		SELECT d.id, d.name, d.type, d.version, d.node_id, d.dbname, d.db_user, d.password,
-		       d.port, d.container_name, d.status, d.created_at, n.host, n.name
+		       d.port, d.container_name, d.status, d.created_at, d.last_deployed_at, n.host, n.name
 		FROM databases d
 		JOIN nodes n ON d.node_id = n.id
 		WHERE d.user_id = ?
@@ -662,7 +685,7 @@ func (s *Store) ListDatabases(userID string) ([]*models.Database, error) {
 	for rows.Next() {
 		d := &models.Database{}
 		if err := rows.Scan(&d.ID, &d.Name, &d.Type, &d.Version, &d.NodeID, &d.DBName, &d.DBUser, &d.Password,
-			&d.Port, &d.ContainerName, &d.Status, &d.CreatedAt, &d.NodeHost, &d.NodeName); err != nil {
+			&d.Port, &d.ContainerName, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.NodeHost, &d.NodeName); err != nil {
 			return nil, err
 		}
 		if d.Password, err = s.decryptEnvVars(d.Password); err != nil {
@@ -677,12 +700,12 @@ func (s *Store) GetDatabase(id, userID string) (*models.Database, error) {
 	d := &models.Database{}
 	err := s.db.QueryRow(`
 		SELECT d.id, d.name, d.type, d.version, d.node_id, d.dbname, d.db_user, d.password,
-		       d.port, d.container_name, d.status, d.created_at, n.host, n.name
+		       d.port, d.container_name, d.status, d.created_at, d.last_deployed_at, n.host, n.name
 		FROM databases d
 		JOIN nodes n ON d.node_id = n.id
 		WHERE d.id = ? AND d.user_id = ?`, id, userID,
 	).Scan(&d.ID, &d.Name, &d.Type, &d.Version, &d.NodeID, &d.DBName, &d.DBUser, &d.Password,
-		&d.Port, &d.ContainerName, &d.Status, &d.CreatedAt, &d.NodeHost, &d.NodeName)
+		&d.Port, &d.ContainerName, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.NodeHost, &d.NodeName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -723,6 +746,11 @@ func (s *Store) UpdateDatabaseStatus(id, userID, status string) error {
 	return err
 }
 
+func (s *Store) UpdateDatabaseLastDeployedAt(id, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE databases SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, id, userID)
+	return err
+}
+
 func (s *Store) DeleteDatabase(id, userID string) error {
 	_, err := s.db.Exec(`DELETE FROM databases WHERE id = ? AND user_id = ?`, id, userID)
 	return err
@@ -746,7 +774,7 @@ func (s *Store) CreateCache(c *models.Cache, userID string) error {
 func (s *Store) ListCaches(userID string) ([]*models.Cache, error) {
 	rows, err := s.db.Query(`
 		SELECT c.id, c.name, c.version, c.node_id, c.password,
-		       c.port, c.container_name, c.status, c.created_at, n.host, n.name
+		       c.port, c.container_name, c.status, c.created_at, c.last_deployed_at, n.host, n.name
 		FROM caches c
 		JOIN nodes n ON c.node_id = n.id
 		WHERE c.user_id = ?
@@ -759,7 +787,7 @@ func (s *Store) ListCaches(userID string) ([]*models.Cache, error) {
 	for rows.Next() {
 		c := &models.Cache{}
 		if err := rows.Scan(&c.ID, &c.Name, &c.Version, &c.NodeID, &c.Password,
-			&c.Port, &c.ContainerName, &c.Status, &c.CreatedAt, &c.NodeHost, &c.NodeName); err != nil {
+			&c.Port, &c.ContainerName, &c.Status, &c.CreatedAt, &c.LastDeployedAt, &c.NodeHost, &c.NodeName); err != nil {
 			return nil, err
 		}
 		if c.Password, err = s.decryptEnvVars(c.Password); err != nil {
@@ -774,12 +802,12 @@ func (s *Store) GetCache(id, userID string) (*models.Cache, error) {
 	c := &models.Cache{}
 	err := s.db.QueryRow(`
 		SELECT c.id, c.name, c.version, c.node_id, c.password,
-		       c.port, c.container_name, c.status, c.created_at, n.host, n.name
+		       c.port, c.container_name, c.status, c.created_at, c.last_deployed_at, n.host, n.name
 		FROM caches c
 		JOIN nodes n ON c.node_id = n.id
 		WHERE c.id = ? AND c.user_id = ?`, id, userID,
 	).Scan(&c.ID, &c.Name, &c.Version, &c.NodeID, &c.Password,
-		&c.Port, &c.ContainerName, &c.Status, &c.CreatedAt, &c.NodeHost, &c.NodeName)
+		&c.Port, &c.ContainerName, &c.Status, &c.CreatedAt, &c.LastDeployedAt, &c.NodeHost, &c.NodeName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -794,6 +822,11 @@ func (s *Store) GetCache(id, userID string) (*models.Cache, error) {
 
 func (s *Store) UpdateCacheStatus(id, userID, status string) error {
 	_, err := s.db.Exec(`UPDATE caches SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
+	return err
+}
+
+func (s *Store) UpdateCacheLastDeployedAt(id, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE caches SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, id, userID)
 	return err
 }
 
@@ -859,7 +892,7 @@ func (s *Store) CreateKafka(k *models.Kafka, userID string) error {
 func (s *Store) ListKafkas(userID string) ([]*models.Kafka, error) {
 	rows, err := s.db.Query(`
 		SELECT k.id, k.name, k.version, k.node_id,
-		       k.port, k.container_name, k.status, k.created_at, n.host, n.name
+		       k.port, k.container_name, k.status, k.created_at, k.last_deployed_at, n.host, n.name
 		FROM kafkas k
 		JOIN nodes n ON k.node_id = n.id
 		WHERE k.user_id = ?
@@ -872,7 +905,7 @@ func (s *Store) ListKafkas(userID string) ([]*models.Kafka, error) {
 	for rows.Next() {
 		k := &models.Kafka{}
 		if err := rows.Scan(&k.ID, &k.Name, &k.Version, &k.NodeID,
-			&k.Port, &k.ContainerName, &k.Status, &k.CreatedAt, &k.NodeHost, &k.NodeName); err != nil {
+			&k.Port, &k.ContainerName, &k.Status, &k.CreatedAt, &k.LastDeployedAt, &k.NodeHost, &k.NodeName); err != nil {
 			return nil, err
 		}
 		kafkas = append(kafkas, k)
@@ -884,12 +917,12 @@ func (s *Store) GetKafka(id, userID string) (*models.Kafka, error) {
 	k := &models.Kafka{}
 	err := s.db.QueryRow(`
 		SELECT k.id, k.name, k.version, k.node_id,
-		       k.port, k.container_name, k.status, k.created_at, n.host, n.name
+		       k.port, k.container_name, k.status, k.created_at, k.last_deployed_at, n.host, n.name
 		FROM kafkas k
 		JOIN nodes n ON k.node_id = n.id
 		WHERE k.id = ? AND k.user_id = ?`, id, userID,
 	).Scan(&k.ID, &k.Name, &k.Version, &k.NodeID,
-		&k.Port, &k.ContainerName, &k.Status, &k.CreatedAt, &k.NodeHost, &k.NodeName)
+		&k.Port, &k.ContainerName, &k.Status, &k.CreatedAt, &k.LastDeployedAt, &k.NodeHost, &k.NodeName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -898,6 +931,11 @@ func (s *Store) GetKafka(id, userID string) (*models.Kafka, error) {
 
 func (s *Store) UpdateKafkaStatus(id, userID, status string) error {
 	_, err := s.db.Exec(`UPDATE kafkas SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
+	return err
+}
+
+func (s *Store) UpdateKafkaLastDeployedAt(id, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE kafkas SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, id, userID)
 	return err
 }
 
@@ -947,7 +985,7 @@ func (s *Store) CreateMonitoring(m *models.Monitoring, userID string) error {
 func (s *Store) ListMonitorings(userID string) ([]*models.Monitoring, error) {
 	rows, err := s.db.Query(`
 		SELECT m.id, m.name, m.node_id, m.prometheus_port, m.grafana_port,
-		       m.prometheus_container_name, m.grafana_container_name, m.status, m.created_at, n.host, n.name
+		       m.prometheus_container_name, m.grafana_container_name, m.status, m.created_at, m.last_deployed_at, n.host, n.name
 		FROM monitorings m
 		JOIN nodes n ON m.node_id = n.id
 		WHERE m.user_id = ?
@@ -960,7 +998,7 @@ func (s *Store) ListMonitorings(userID string) ([]*models.Monitoring, error) {
 	for rows.Next() {
 		m := &models.Monitoring{}
 		if err := rows.Scan(&m.ID, &m.Name, &m.NodeID, &m.PrometheusPort, &m.GrafanaPort,
-			&m.PrometheusContainerName, &m.GrafanaContainerName, &m.Status, &m.CreatedAt, &m.NodeHost, &m.NodeName); err != nil {
+			&m.PrometheusContainerName, &m.GrafanaContainerName, &m.Status, &m.CreatedAt, &m.LastDeployedAt, &m.NodeHost, &m.NodeName); err != nil {
 			return nil, err
 		}
 		monitorings = append(monitorings, m)
@@ -972,12 +1010,12 @@ func (s *Store) GetMonitoring(id, userID string) (*models.Monitoring, error) {
 	m := &models.Monitoring{}
 	err := s.db.QueryRow(`
 		SELECT m.id, m.name, m.node_id, m.prometheus_port, m.grafana_port, m.grafana_password,
-		       m.prometheus_container_name, m.grafana_container_name, m.status, m.created_at, n.host, n.name
+		       m.prometheus_container_name, m.grafana_container_name, m.status, m.created_at, m.last_deployed_at, n.host, n.name
 		FROM monitorings m
 		JOIN nodes n ON m.node_id = n.id
 		WHERE m.id = ? AND m.user_id = ?`, id, userID,
 	).Scan(&m.ID, &m.Name, &m.NodeID, &m.PrometheusPort, &m.GrafanaPort, &m.GrafanaPassword,
-		&m.PrometheusContainerName, &m.GrafanaContainerName, &m.Status, &m.CreatedAt, &m.NodeHost, &m.NodeName)
+		&m.PrometheusContainerName, &m.GrafanaContainerName, &m.Status, &m.CreatedAt, &m.LastDeployedAt, &m.NodeHost, &m.NodeName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -993,6 +1031,11 @@ func (s *Store) GetMonitoring(id, userID string) (*models.Monitoring, error) {
 
 func (s *Store) UpdateMonitoringStatus(id, userID, status string) error {
 	_, err := s.db.Exec(`UPDATE monitorings SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
+	return err
+}
+
+func (s *Store) UpdateMonitoringLastDeployedAt(id, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE monitorings SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, id, userID)
 	return err
 }
 

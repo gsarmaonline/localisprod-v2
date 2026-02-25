@@ -89,13 +89,14 @@ export default function Kafkas() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Bootstrap Server</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Env Var</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Started At</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {kafkaList.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No Kafka clusters yet</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No Kafka clusters yet</td>
               </tr>
             )}
             {kafkaList.map(k => (
@@ -116,6 +117,7 @@ export default function Kafkas() {
                 <td className="px-4 py-3">
                   <StatusBadge status={k.status} />
                 </td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{k.last_deployed_at ? new Date(k.last_deployed_at).toLocaleString() : '—'}</td>
                 <td className="px-4 py-3">
                   <button
                     onClick={() => handleDelete(k.id)}

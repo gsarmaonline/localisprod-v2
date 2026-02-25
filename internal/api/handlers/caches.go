@@ -122,8 +122,11 @@ func (h *CacheHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now().UTC()
 	_ = h.store.UpdateCacheStatus(c.ID, userID, "running")
+	_ = h.store.UpdateCacheLastDeployedAt(c.ID, userID, now)
 	c.Status = "running"
+	c.LastDeployedAt = &now
 	writeJSON(w, http.StatusCreated, c)
 }
 

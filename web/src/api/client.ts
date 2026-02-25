@@ -83,6 +83,7 @@ export interface Application {
   kafkas: string       // JSON string — array of kafka cluster IDs
   monitorings: string  // JSON string — array of monitoring stack IDs
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateApplicationInput {
@@ -115,6 +116,7 @@ export interface Database {
   container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateDatabaseInput {
@@ -149,6 +151,7 @@ export interface Cache {
   container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateCacheInput {
@@ -180,6 +183,7 @@ export interface Kafka {
   container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateKafkaInput {
@@ -211,6 +215,7 @@ export interface Monitoring {
   grafana_container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateMonitoringInput {
@@ -280,6 +285,7 @@ export interface Deployment {
   container_id: string
   status: string
   created_at: string
+  last_deployed_at?: string
   app_name?: string
   node_name?: string
   docker_image?: string

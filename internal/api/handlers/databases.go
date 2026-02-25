@@ -186,8 +186,11 @@ func (h *DatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now().UTC()
 	_ = h.store.UpdateDatabaseStatus(db.ID, userID, "running")
+	_ = h.store.UpdateDatabaseLastDeployedAt(db.ID, userID, now)
 	db.Status = "running"
+	db.LastDeployedAt = &now
 	writeJSON(w, http.StatusCreated, db)
 }
 
