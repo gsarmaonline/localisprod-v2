@@ -14,6 +14,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	appH := handlers.NewApplicationHandler(s)
 	depH := handlers.NewDeploymentHandler(s)
 	dbH := handlers.NewDatabaseHandler(s)
+	cacheH := handlers.NewCacheHandler(s)
 	dashH := handlers.NewDashboardHandler(s)
 	settingsH := handlers.NewSettingsHandler(s, appURL)
 	githubH := handlers.NewGithubHandler(s)
@@ -197,6 +198,35 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 			dbH.Get(w, r, id)
 		case http.MethodDelete:
 			dbH.Delete(w, r, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Caches
+	protectedMux.HandleFunc("/api/caches", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			cacheH.List(w, r)
+		case http.MethodPost:
+			cacheH.Create(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	protectedMux.HandleFunc("/api/caches/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/caches/")
+		id := strings.TrimSuffix(path, "/")
+		if id == "" {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			cacheH.Get(w, r, id)
+		case http.MethodDelete:
+			cacheH.Delete(w, r, id)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

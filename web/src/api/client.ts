@@ -76,6 +76,7 @@ export interface Application {
   github_repo: string
   domain: string
   databases: string // JSON string — array of database IDs
+  caches: string    // JSON string — array of cache IDs
   created_at: string
 }
 
@@ -89,13 +90,14 @@ export interface CreateApplicationInput {
   github_repo?: string
   domain?: string
   databases?: string[]
+  caches?: string[]
 }
 
 // Databases
 export interface Database {
   id: string
   name: string
-  type: string     // postgres | mysql | redis | mongodb
+  type: string     // postgres
   version: string
   node_id: string
   node_name: string
@@ -126,6 +128,37 @@ export const databases = {
     request<Database>('/databases', { method: 'POST', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/databases/${id}`, { method: 'DELETE' }),
+}
+
+// Caches
+export interface Cache {
+  id: string
+  name: string
+  version: string
+  node_id: string
+  node_name: string
+  node_host: string
+  port: number
+  container_name: string
+  status: string
+  created_at: string
+}
+
+export interface CreateCacheInput {
+  name: string
+  version?: string
+  node_id: string
+  password: string
+  port?: number
+}
+
+export const caches = {
+  list: () => request<Cache[]>('/caches'),
+  get: (id: string) => request<Cache>(`/caches/${id}`),
+  create: (data: CreateCacheInput) =>
+    request<Cache>('/caches', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/caches/${id}`, { method: 'DELETE' }),
 }
 
 export const applications = {

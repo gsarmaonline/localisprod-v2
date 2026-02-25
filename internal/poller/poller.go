@@ -135,6 +135,7 @@ func (p *Poller) reconcileStatus() {
 	p.reconcileNodes()
 	p.reconcileDeployments()
 	p.reconcileDatabases()
+	p.reconcileCaches()
 }
 
 func (p *Poller) reconcileNodes() {
@@ -201,6 +202,30 @@ func (p *Poller) reconcileDatabases() {
 		if strings.TrimSpace(output) != "running" {
 			_ = p.store.UpdateDatabaseStatus(db.ID, db.UserID, "stopped")
 			log.Printf("poller: database %s container %s is %q, marked stopped", db.ID, db.ContainerName, strings.TrimSpace(output))
+		}
+	}
+}
+
+func (p *Poller) reconcileCaches() {
+	caches, err := p.store.ListAllRunningCaches()
+	if err != nil {
+		log.Printf("poller: list running caches for health check: %v", err)
+		return
+	}
+	for _, c := range caches {
+		node, err := p.store.GetNode(c.NodeID, c.UserID)
+		if err != nil || node == nil {
+			continue
+		}
+		runner := sshexec.NewRunner(node)
+		output, err := runner.Run(sshexec.DockerInspectStatusCmd(c.ContainerName))
+		if err != nil {
+			log.Printf("poller: inspect cache %s (%s): %v", c.ID, c.ContainerName, err)
+			continue
+		}
+		if strings.TrimSpace(output) != "running" {
+			_ = p.store.UpdateCacheStatus(c.ID, c.UserID, "stopped")
+			log.Printf("poller: cache %s container %s is %q, marked stopped", c.ID, c.ContainerName, strings.TrimSpace(output))
 		}
 	}
 }
