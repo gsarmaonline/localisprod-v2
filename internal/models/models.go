@@ -37,6 +37,7 @@ type Application struct {
 	Domain         string    `json:"domain"`
 	Databases      string    `json:"databases"`  // JSON ["db-id-1"]
 	Caches         string    `json:"caches"`     // JSON ["cache-id-1"]
+	Kafkas         string    `json:"kafkas"`     // JSON ["kafka-id-1"]
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -46,6 +47,21 @@ type Cache struct {
 	Version       string    `json:"version"`
 	NodeID        string    `json:"node_id"`
 	Password      string    `json:"password,omitempty"`
+	Port          int       `json:"port"`
+	ContainerName string    `json:"container_name"`
+	Status        string    `json:"status"`
+	UserID        string    `json:"user_id,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	// Joined fields
+	NodeHost string `json:"node_host,omitempty"`
+	NodeName string `json:"node_name,omitempty"`
+}
+
+type Kafka struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Version       string    `json:"version"`
+	NodeID        string    `json:"node_id"`
 	Port          int       `json:"port"`
 	ContainerName string    `json:"container_name"`
 	Status        string    `json:"status"`

@@ -125,6 +125,29 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Inject Kafka bootstrap server addresses from linked Kafka clusters
+	var kafkaIDs []string
+	_ = json.Unmarshal([]byte(app.Kafkas), &kafkaIDs)
+	for _, kID := range kafkaIDs {
+		k, err := h.store.GetKafka(kID, userID)
+		if err != nil || k == nil {
+			continue
+		}
+		if envVars == nil {
+			envVars = map[string]string{}
+		}
+		envVars[KafkaEnvVarName(k.Name)] = KafkaConnectionURL(k)
+	}
+	// For single-Kafka apps, also inject KAFKA_BROKERS as a convenience alias.
+	if len(kafkaIDs) == 1 {
+		if _, exists := envVars["KAFKA_BROKERS"]; !exists {
+			k, err := h.store.GetKafka(kafkaIDs[0], userID)
+			if err == nil && k != nil {
+				envVars["KAFKA_BROKERS"] = KafkaConnectionURL(k)
+			}
+		}
+	}
+
 	runner := sshexec.NewRunner(node)
 
 	// If image is from ghcr.io, authenticate first

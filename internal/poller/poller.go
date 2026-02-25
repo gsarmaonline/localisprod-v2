@@ -136,6 +136,7 @@ func (p *Poller) reconcileStatus() {
 	p.reconcileDeployments()
 	p.reconcileDatabases()
 	p.reconcileCaches()
+	p.reconcileKafkas()
 }
 
 func (p *Poller) reconcileNodes() {
@@ -226,6 +227,30 @@ func (p *Poller) reconcileCaches() {
 		if strings.TrimSpace(output) != "running" {
 			_ = p.store.UpdateCacheStatus(c.ID, c.UserID, "stopped")
 			log.Printf("poller: cache %s container %s is %q, marked stopped", c.ID, c.ContainerName, strings.TrimSpace(output))
+		}
+	}
+}
+
+func (p *Poller) reconcileKafkas() {
+	kafkas, err := p.store.ListAllRunningKafkas()
+	if err != nil {
+		log.Printf("poller: list running kafka clusters for health check: %v", err)
+		return
+	}
+	for _, k := range kafkas {
+		node, err := p.store.GetNode(k.NodeID, k.UserID)
+		if err != nil || node == nil {
+			continue
+		}
+		runner := sshexec.NewRunner(node)
+		output, err := runner.Run(sshexec.DockerInspectStatusCmd(k.ContainerName))
+		if err != nil {
+			log.Printf("poller: inspect kafka %s (%s): %v", k.ID, k.ContainerName, err)
+			continue
+		}
+		if strings.TrimSpace(output) != "running" {
+			_ = p.store.UpdateKafkaStatus(k.ID, k.UserID, "stopped")
+			log.Printf("poller: kafka %s container %s is %q, marked stopped", k.ID, k.ContainerName, strings.TrimSpace(output))
 		}
 	}
 }

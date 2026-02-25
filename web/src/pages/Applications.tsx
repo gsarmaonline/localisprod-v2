@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGithub } from '@fortawesome/free-brands-svg-icons'
-import { applications, databases, caches, github, settings, Application, Database, Cache, CreateApplicationInput, GithubRepo } from '../api/client'
+import { applications, databases, caches, kafkas, github, settings, Application, Database, Cache, Kafka, CreateApplicationInput, GithubRepo } from '../api/client'
 import Modal from '../components/Modal'
 
 export default function Applications() {
   const [appList, setAppList] = useState<Application[]>([])
   const [dbList, setDbList] = useState<Database[]>([])
   const [cacheList, setCacheList] = useState<Cache[]>([])
+  const [kafkaList, setKafkaList] = useState<Kafka[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showRepoPicker, setShowRepoPicker] = useState(false)
@@ -27,19 +28,21 @@ export default function Applications() {
     ports: string[]
     databases: string[]
     caches: string[]
+    kafkas: string[]
   }>({
     name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '',
     envPairs: [{ key: '', value: '' }],
     ports: [''],
     databases: [],
     caches: [],
+    kafkas: [],
   })
 
   const [showEnvPaste, setShowEnvPaste] = useState(false)
   const [envPasteText, setEnvPasteText] = useState('')
 
   const resetForm = () => {
-    setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [], caches: [] })
+    setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [], caches: [], kafkas: [] })
     setShowEnvPaste(false)
     setEnvPasteText('')
   }
@@ -68,6 +71,7 @@ export default function Applications() {
     load()
     databases.list().then(setDbList).catch(() => {})
     caches.list().then(setCacheList).catch(() => {})
+    kafkas.list().then(setKafkaList).catch(() => {})
   }, [])
 
   const handleCreate = async () => {
@@ -88,6 +92,7 @@ export default function Applications() {
         domain: form.domain || undefined,
         databases: form.databases.length > 0 ? form.databases : undefined,
         caches: form.caches.length > 0 ? form.caches : undefined,
+        kafkas: form.kafkas.length > 0 ? form.kafkas : undefined,
       }
       if (editingId) {
         await applications.update(editingId, data)
@@ -125,6 +130,10 @@ export default function Applications() {
     try {
       cs = JSON.parse(a.caches) as string[]
     } catch { /* keep default */ }
+    let ks: string[] = []
+    try {
+      ks = JSON.parse(a.kafkas) as string[]
+    } catch { /* keep default */ }
     setForm({
       name: a.name,
       docker_image: a.docker_image,
@@ -136,6 +145,7 @@ export default function Applications() {
       ports,
       databases: dbs,
       caches: cs,
+      kafkas: ks,
     })
     setEditingId(a.id)
     setShowCreate(true)
@@ -189,6 +199,7 @@ export default function Applications() {
       ports: [''],
       databases: [],
       caches: [],
+      kafkas: [],
     })
     setShowCreate(true)
   }
@@ -558,6 +569,52 @@ export default function Applications() {
                   {form.caches.length === 1
                     ? 'CACHE_URL is also set automatically. Add CACHE_URL to env vars above to override it.'
                     : 'Connection URLs are injected automatically as env vars on deploy.'}
+                </p>
+              </div>
+            )}
+
+            {/* Kafkas */}
+            {kafkaList.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Linked Kafka Clusters</label>
+                <div className="space-y-1 border rounded-lg p-2">
+                  {kafkaList.map(k => {
+                    const checked = form.kafkas.includes(k.id)
+                    return (
+                      <label key={k.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setForm(prev => ({
+                              ...prev,
+                              kafkas: checked
+                                ? prev.kafkas.filter(id => id !== k.id)
+                                : [...prev.kafkas, k.id],
+                            }))
+                          }
+                          className="accent-orange-600"
+                        />
+                        <span className="font-medium">{k.name}</span>
+                        <span className="text-gray-400 text-xs">kafka:{k.version}</span>
+                        {checked && (
+                          <span className="ml-auto flex items-center gap-1.5">
+                            <span className="font-mono text-xs text-orange-600">
+                              {k.name.toUpperCase().replace(/[-\s.]/g, '_')}_URL
+                            </span>
+                            {form.kafkas.length === 1 && (
+                              <span className="font-mono text-xs text-orange-600">· KAFKA_BROKERS</span>
+                            )}
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">
+                  {form.kafkas.length === 1
+                    ? 'KAFKA_BROKERS is also set automatically. Add KAFKA_BROKERS to env vars above to override it.'
+                    : 'Bootstrap server addresses are injected automatically as env vars on deploy.'}
                 </p>
               </div>
             )}

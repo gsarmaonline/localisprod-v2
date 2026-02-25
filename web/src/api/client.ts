@@ -77,6 +77,7 @@ export interface Application {
   domain: string
   databases: string // JSON string — array of database IDs
   caches: string    // JSON string — array of cache IDs
+  kafkas: string    // JSON string — array of kafka cluster IDs
   created_at: string
 }
 
@@ -91,6 +92,7 @@ export interface CreateApplicationInput {
   domain?: string
   databases?: string[]
   caches?: string[]
+  kafkas?: string[]
 }
 
 // Databases
@@ -159,6 +161,36 @@ export const caches = {
     request<Cache>('/caches', { method: 'POST', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/caches/${id}`, { method: 'DELETE' }),
+}
+
+// Kafkas
+export interface Kafka {
+  id: string
+  name: string
+  version: string
+  node_id: string
+  node_name: string
+  node_host: string
+  port: number
+  container_name: string
+  status: string
+  created_at: string
+}
+
+export interface CreateKafkaInput {
+  name: string
+  version?: string
+  node_id: string
+  port?: number
+}
+
+export const kafkas = {
+  list: () => request<Kafka[]>('/kafkas'),
+  get: (id: string) => request<Kafka>(`/kafkas/${id}`),
+  create: (data: CreateKafkaInput) =>
+    request<Kafka>('/kafkas', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/kafkas/${id}`, { method: 'DELETE' }),
 }
 
 export const applications = {
