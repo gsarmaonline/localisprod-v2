@@ -29,20 +29,21 @@ type Node struct {
 }
 
 type Application struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	DockerImage    string    `json:"docker_image"`
-	DockerfilePath string    `json:"dockerfile_path"`
-	EnvVars        string    `json:"env_vars"`    // JSON {"KEY":"VAL"}
-	Ports          string    `json:"ports"`       // JSON ["8080:80"]
-	Command        string    `json:"command"`
-	GithubRepo     string    `json:"github_repo"`
-	Domain         string    `json:"domain"`
-	Databases      string    `json:"databases"`   // JSON ["db-id-1"]
-	Caches         string    `json:"caches"`      // JSON ["cache-id-1"]
-	Kafkas         string    `json:"kafkas"`      // JSON ["kafka-id-1"]
-	Monitorings    string    `json:"monitorings"` // JSON ["monitoring-id-1"]
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	DockerImage    string     `json:"docker_image"`
+	DockerfilePath string     `json:"dockerfile_path"`
+	EnvVars        string     `json:"env_vars"`    // JSON {"KEY":"VAL"}
+	Ports          string     `json:"ports"`       // JSON ["8080:80"]
+	Command        string     `json:"command"`
+	GithubRepo     string     `json:"github_repo"`
+	Domain         string     `json:"domain"`
+	Databases      string     `json:"databases"`   // JSON ["db-id-1"]
+	Caches         string     `json:"caches"`      // JSON ["cache-id-1"]
+	Kafkas         string     `json:"kafkas"`      // JSON ["kafka-id-1"]
+	Monitorings    string     `json:"monitorings"` // JSON ["monitoring-id-1"]
+	CreatedAt      time.Time  `json:"created_at"`
+	LastDeployedAt *time.Time `json:"last_deployed_at,omitempty"`
 }
 
 type Monitoring struct {
@@ -113,14 +114,15 @@ type Database struct {
 }
 
 type Deployment struct {
-	ID            string    `json:"id"`
-	ApplicationID string    `json:"application_id"`
-	NodeID        string    `json:"node_id"`
-	ContainerName string    `json:"container_name"`
-	ContainerID   string    `json:"container_id"`
-	Status        string    `json:"status"`
-	UserID        string    `json:"user_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             string     `json:"id"`
+	ApplicationID  string     `json:"application_id"`
+	NodeID         string     `json:"node_id"`
+	ContainerName  string     `json:"container_name"`
+	ContainerID    string     `json:"container_id"`
+	Status         string     `json:"status"`
+	UserID         string     `json:"user_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastDeployedAt *time.Time `json:"last_deployed_at,omitempty"`
 	// Joined fields
 	AppName     string `json:"app_name,omitempty"`
 	NodeName    string `json:"node_name,omitempty"`

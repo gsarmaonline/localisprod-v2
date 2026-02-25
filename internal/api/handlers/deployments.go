@@ -285,9 +285,13 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	containerID := strings.TrimSpace(output)
+	now := time.Now().UTC()
 	_ = h.store.UpdateDeploymentStatus(deployment.ID, userID, "running", containerID)
+	_ = h.store.UpdateDeploymentLastDeployedAt(deployment.ID, userID, now)
+	_ = h.store.UpdateApplicationLastDeployedAt(body.ApplicationID, userID, now)
 	deployment.Status = "running"
 	deployment.ContainerID = containerID
+	deployment.LastDeployedAt = &now
 
 	writeJSON(w, http.StatusCreated, deployment)
 }
@@ -382,7 +386,10 @@ func (h *DeploymentHandler) Restart(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 
+	now := time.Now().UTC()
 	_ = h.store.UpdateDeploymentStatus(id, userID, "running", d.ContainerID)
+	_ = h.store.UpdateDeploymentLastDeployedAt(id, userID, now)
+	_ = h.store.UpdateApplicationLastDeployedAt(d.ApplicationID, userID, now)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "running",
 		"message": "container restarted",

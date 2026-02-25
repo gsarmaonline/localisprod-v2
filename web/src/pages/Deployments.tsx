@@ -103,13 +103,14 @@ export default function Deployments() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Container</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Created</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Last Deploy</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {depList.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">No deployments yet</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No deployments yet</td>
               </tr>
             )}
             {depList.map(d => (
@@ -119,6 +120,7 @@ export default function Deployments() {
                 <td className="px-4 py-3 text-gray-600 font-mono text-xs">{d.container_name}</td>
                 <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
                 <td className="px-4 py-3 text-gray-500">{new Date(d.created_at).toLocaleString()}</td>
+                <td className="px-4 py-3 text-gray-500">{d.last_deployed_at ? new Date(d.last_deployed_at).toLocaleString() : '—'}</td>
                 <td className="px-4 py-3 flex gap-1">
                   <button
                     onClick={() => handleLogs(d.id)}

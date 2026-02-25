@@ -83,6 +83,7 @@ export interface Application {
   kafkas: string       // JSON string — array of kafka cluster IDs
   monitorings: string  // JSON string — array of monitoring stack IDs
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateApplicationInput {
@@ -280,6 +281,7 @@ export interface Deployment {
   container_id: string
   status: string
   created_at: string
+  last_deployed_at?: string
   app_name?: string
   node_name?: string
   docker_image?: string
