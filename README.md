@@ -14,6 +14,7 @@ A cluster management system for deploying Docker containers to SSH-accessible no
 - Deploy applications as Docker containers onto nodes via SSH
 - View container logs, restart or stop deployments
 - Dashboard with live counts across nodes, apps, and deployment statuses
+- **Cloud node provisioning**: provision VMs directly from the UI on **DigitalOcean** (Droplets) or **AWS** (EC2) — SSH key generation, instance creation, and node registration are handled automatically; credentials stored per-user in Settings
 - **GitHub webhook auto-redeploy**: automatically re-pulls and restarts containers when a new image is published to GHCR
 - **Per-user webhook URL**: each user has a personal webhook endpoint so multiple accounts can integrate with different GitHub repos
 - **Background image poller**: periodically pulls each deployment's image and redeploys automatically when a newer version is available (no webhook required)
@@ -165,9 +166,13 @@ All `/api/*` routes except `/api/auth/google`, `/api/auth/google/callback`, and 
 | POST   | `/api/deployments/:id/restart`        | Restart container                |
 | GET    | `/api/deployments/:id/logs`           | Fetch last 200 log lines         |
 | GET    | `/api/stats`                          | Dashboard counts                 |
-| GET    | `/api/settings`                       | Get GitHub + webhook settings    |
-| PUT    | `/api/settings`                       | Update GitHub + webhook settings |
+| GET    | `/api/settings`                       | Get GitHub, webhook, and cloud provider settings |
+| PUT    | `/api/settings`                       | Update GitHub, webhook, and cloud provider settings |
 | POST   | `/api/webhooks/github/{token}`        | Per-user GitHub registry webhook |
+| GET    | `/api/providers/do/metadata`          | DigitalOcean regions, sizes, images |
+| POST   | `/api/providers/do/provision`         | Provision a DigitalOcean Droplet + register node |
+| GET    | `/api/providers/aws/metadata`         | AWS regions, instance types, OS options |
+| POST   | `/api/providers/aws/provision`        | Provision an AWS EC2 instance + register node |
 
 ## Continuous Deployment
 

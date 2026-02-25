@@ -40,6 +40,9 @@ export interface Node {
   username: string
   status: string
   traefik_enabled: boolean
+  provider?: string
+  provider_region?: string
+  provider_instance_id?: string
   created_at: string
 }
 
@@ -257,11 +260,14 @@ export interface Settings {
   github_token: string     // "configured" | ""
   webhook_secret: string   // "configured" | ""
   webhook_url: string
+  do_api_token: string     // "configured" | ""
+  aws_access_key_id: string
+  aws_secret_access_key: string  // "configured" | ""
 }
 
 export const settings = {
   get: () => request<Settings>('/settings'),
-  update: (data: { github_username: string; github_token: string; webhook_secret?: string }) =>
+  update: (data: Record<string, string>) =>
     request<{ status: string }>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
 }
 
@@ -295,6 +301,28 @@ export const deployments = {
     request<{ status: string; message: string }>(`/deployments/${id}/restart`, { method: 'POST' }),
   logs: (id: string) =>
     request<{ logs: string; error?: string }>(`/deployments/${id}/logs`),
+}
+
+// Cloud Providers
+export interface DORegion { slug: string; name: string }
+export interface DOSize { slug: string; description: string; vcpus: number; memory_mb: number; disk_gb: number; price_monthly: number }
+export interface DOImage { slug: string; name: string }
+export interface DOMetadata { regions: DORegion[]; sizes: DOSize[]; images: DOImage[] }
+export interface DOProvisionInput { name: string; region: string; size: string; image: string }
+
+export interface AWSRegion { id: string; name: string }
+export interface AWSInstanceType { id: string; vcpus: number; memory_gib: number; description: string }
+export interface AWSOSOption { id: string; name: string }
+export interface AWSMetadata { regions: AWSRegion[]; instance_types: AWSInstanceType[]; os_options: AWSOSOption[] }
+export interface AWSProvisionInput { name: string; region: string; instance_type: string; os: string }
+
+export const providers = {
+  doMetadata: () => request<DOMetadata>('/providers/do/metadata'),
+  doProvision: (data: DOProvisionInput) =>
+    request<Node>('/providers/do/provision', { method: 'POST', body: JSON.stringify(data) }),
+  awsMetadata: () => request<AWSMetadata>('/providers/aws/metadata'),
+  awsProvision: (data: AWSProvisionInput) =>
+    request<Node>('/providers/aws/provision', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 // Dashboard

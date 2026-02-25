@@ -12,17 +12,20 @@ type User struct {
 }
 
 type Node struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Host           string    `json:"host"`
-	Port           int       `json:"port"`
-	Username       string    `json:"username"`
-	PrivateKey     string    `json:"private_key,omitempty"`
-	Status         string    `json:"status"`
-	IsLocal        bool      `json:"is_local"`
-	TraefikEnabled bool      `json:"traefik_enabled"`
-	UserID         string    `json:"user_id,omitempty"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	Host               string    `json:"host"`
+	Port               int       `json:"port"`
+	Username           string    `json:"username"`
+	PrivateKey         string    `json:"private_key,omitempty"`
+	Status             string    `json:"status"`
+	IsLocal            bool      `json:"is_local"`
+	TraefikEnabled     bool      `json:"traefik_enabled"`
+	Provider           string    `json:"provider,omitempty"`
+	ProviderRegion     string    `json:"provider_region,omitempty"`
+	ProviderInstanceID string    `json:"provider_instance_id,omitempty"`
+	UserID             string    `json:"user_id,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 type Application struct {

@@ -22,6 +22,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	githubH := handlers.NewGithubHandler(s)
 	webhookH := handlers.NewWebhookHandler(s)
 	authH := handlers.NewAuthHandler(s, oauthSvc, jwtSvc, appURL, rootEmail)
+	providersH := handlers.NewProvidersHandler(s)
 
 	// Unprotected mux (auth + webhooks)
 	publicMux := http.NewServeMux()
@@ -288,6 +289,36 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 		case http.MethodDelete:
 			monitoringH.Delete(w, r, id)
 		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Cloud Providers
+	protectedMux.HandleFunc("/api/providers/do/metadata", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			providersH.DOMetadata(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	protectedMux.HandleFunc("/api/providers/do/provision", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			providersH.DOProvision(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	protectedMux.HandleFunc("/api/providers/aws/metadata", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			providersH.AWSMetadata(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	protectedMux.HandleFunc("/api/providers/aws/provision", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			providersH.AWSProvision(w, r)
+		} else {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
