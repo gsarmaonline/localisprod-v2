@@ -15,6 +15,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	depH := handlers.NewDeploymentHandler(s)
 	dbH := handlers.NewDatabaseHandler(s)
 	cacheH := handlers.NewCacheHandler(s)
+	kafkaH := handlers.NewKafkaHandler(s)
 	dashH := handlers.NewDashboardHandler(s)
 	settingsH := handlers.NewSettingsHandler(s, appURL)
 	githubH := handlers.NewGithubHandler(s)
@@ -227,6 +228,35 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 			cacheH.Get(w, r, id)
 		case http.MethodDelete:
 			cacheH.Delete(w, r, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Kafkas
+	protectedMux.HandleFunc("/api/kafkas", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			kafkaH.List(w, r)
+		case http.MethodPost:
+			kafkaH.Create(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	protectedMux.HandleFunc("/api/kafkas/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/kafkas/")
+		id := strings.TrimSuffix(path, "/")
+		if id == "" {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			kafkaH.Get(w, r, id)
+		case http.MethodDelete:
+			kafkaH.Delete(w, r, id)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

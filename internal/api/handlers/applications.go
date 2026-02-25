@@ -34,6 +34,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Domain         string            `json:"domain"`
 		Databases      []string          `json:"databases"`
 		Caches         []string          `json:"caches"`
+		Kafkas         []string          `json:"kafkas"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -60,6 +61,10 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if body.Caches == nil {
 		cachesJSON = []byte("[]")
 	}
+	kafkasJSON, _ := json.Marshal(body.Kafkas)
+	if body.Kafkas == nil {
+		kafkasJSON = []byte("[]")
+	}
 
 	app := &models.Application{
 		ID:             uuid.New().String(),
@@ -73,6 +78,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Domain:         body.Domain,
 		Databases:      string(dbsJSON),
 		Caches:         string(cachesJSON),
+		Kafkas:         string(kafkasJSON),
 		CreatedAt:      time.Now().UTC(),
 	}
 	if err := h.store.CreateApplication(app, userID); err != nil {
@@ -135,6 +141,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 		Domain         string            `json:"domain"`
 		Databases      []string          `json:"databases"`
 		Caches         []string          `json:"caches"`
+		Kafkas         []string          `json:"kafkas"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -160,6 +167,10 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	if body.Caches == nil {
 		cachesJSON = []byte("[]")
 	}
+	kafkasJSON, _ := json.Marshal(body.Kafkas)
+	if body.Kafkas == nil {
+		kafkasJSON = []byte("[]")
+	}
 	existing.Name = body.Name
 	existing.DockerImage = body.DockerImage
 	existing.DockerfilePath = body.DockerfilePath
@@ -169,6 +180,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	existing.Domain = body.Domain
 	existing.Databases = string(dbsJSON)
 	existing.Caches = string(cachesJSON)
+	existing.Kafkas = string(kafkasJSON)
 	if err := h.store.UpdateApplication(existing, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
