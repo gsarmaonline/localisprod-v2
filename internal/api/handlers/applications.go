@@ -3,12 +3,15 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gsarma/localisprod-v2/internal/models"
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
+
+var validAppName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
 type ApplicationHandler struct {
 	store *store.Store
@@ -43,6 +46,10 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Name == "" || body.DockerImage == "" {
 		writeError(w, http.StatusBadRequest, "name and docker_image are required")
+		return
+	}
+	if !validAppName.MatchString(body.Name) {
+		writeError(w, http.StatusBadRequest, "application name must contain only letters, numbers, hyphens, and underscores")
 		return
 	}
 
@@ -88,7 +95,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:      time.Now().UTC(),
 	}
 	if err := h.store.CreateApplication(app, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, app)
@@ -101,7 +108,7 @@ func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	apps, err := h.store.ListApplications(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if apps == nil {
@@ -117,7 +124,7 @@ func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request, id stri
 	}
 	app, err := h.store.GetApplication(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if app == nil {
@@ -158,6 +165,10 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 		writeError(w, http.StatusBadRequest, "name and docker_image are required")
 		return
 	}
+	if !validAppName.MatchString(body.Name) {
+		writeError(w, http.StatusBadRequest, "application name must contain only letters, numbers, hyphens, and underscores")
+		return
+	}
 	envJSON, _ := json.Marshal(body.EnvVars)
 	if body.EnvVars == nil {
 		envJSON = []byte("{}")
@@ -194,7 +205,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	existing.Kafkas = string(kafkasJSON)
 	existing.Monitorings = string(monitoringsJSON)
 	if err := h.store.UpdateApplication(existing, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, existing)
@@ -207,7 +218,7 @@ func (h *ApplicationHandler) Delete(w http.ResponseWriter, r *http.Request, id s
 	}
 	app, err := h.store.GetApplication(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if app == nil {
@@ -215,7 +226,7 @@ func (h *ApplicationHandler) Delete(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	if err := h.store.DeleteApplication(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

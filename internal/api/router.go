@@ -383,7 +383,16 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	mainMux.Handle("/api/webhooks/github/", publicMux)
 	mainMux.Handle("/api/", protectedHandler)
 
-	return corsMiddleware(mainMux, appURL)
+	return securityHeadersMiddleware(corsMiddleware(bodyLimitMiddleware(mainMux), appURL))
+}
+
+// bodyLimitMiddleware caps request bodies at 1 MiB to prevent DoS via large payloads.
+func bodyLimitMiddleware(next http.Handler) http.Handler {
+	const maxBytes = 1 << 20 // 1 MiB
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+		next.ServeHTTP(w, r)
+	})
 }
 
 func corsMiddleware(next http.Handler, appURL string) http.Handler {
@@ -396,6 +405,17 @@ func corsMiddleware(next http.Handler, appURL string) http.Handler {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// securityHeadersMiddleware adds common security-related HTTP response headers.
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;")
 		next.ServeHTTP(w, r)
 	})
 }

@@ -40,7 +40,7 @@ func webhookRequest(t *testing.T, event string, payload any, secret string) *htt
 	return r
 }
 
-// mustSetupWebhookUser creates a user with a known webhook token and returns the token.
+// mustSetupWebhookUser creates a user with a known webhook token and returns the user ID.
 func mustSetupWebhookUser(t *testing.T, s interface {
 	UpsertUser(string, string, string, string) (*models.User, error)
 	SetUserSetting(string, string, string) error
@@ -54,6 +54,21 @@ func mustSetupWebhookUser(t *testing.T, s interface {
 		t.Fatalf("SetUserSetting webhook_token: %v", err)
 	}
 	return u.ID
+}
+
+const testWebhookSecret = "test-webhook-secret-abc"
+
+// mustSetupWebhookUserWithSecret creates a user with a webhook token and a webhook secret.
+func mustSetupWebhookUserWithSecret(t *testing.T, s interface {
+	UpsertUser(string, string, string, string) (*models.User, error)
+	SetUserSetting(string, string, string) error
+}) string {
+	t.Helper()
+	userID := mustSetupWebhookUser(t, s)
+	if err := s.SetUserSetting(userID, "webhook_secret", testWebhookSecret); err != nil {
+		t.Fatalf("SetUserSetting webhook_secret: %v", err)
+	}
+	return userID
 }
 
 // ---- verifySignature (indirectly tested through the handler) ----
@@ -75,14 +90,29 @@ func TestWebhookGithubForUser_InvalidToken(t *testing.T) {
 	}
 }
 
-func TestWebhookGithubForUser_NoSecret_IgnoreNonRegistryEvent(t *testing.T) {
+func TestWebhookGithubForUser_NoSecret_Returns401(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUser(t, s) // no webhook_secret configured
 
 	payload := map[string]any{"action": "opened"}
 	rec := httptest.NewRecorder()
 	r := webhookRequest(t, "push", payload, "")
+	h.GithubForUser(rec, r, testWebhookToken)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401 when no secret configured, got %d", rec.Code)
+	}
+}
+
+func TestWebhookGithubForUser_WithSecret_IgnoreNonRegistryEvent(t *testing.T) {
+	s := newTestStore(t)
+	h := handlers.NewWebhookHandler(s)
+	mustSetupWebhookUserWithSecret(t, s)
+
+	payload := map[string]any{"action": "opened"}
+	rec := httptest.NewRecorder()
+	r := webhookRequest(t, "push", payload, testWebhookSecret)
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	if rec.Code != http.StatusOK {
@@ -168,7 +198,7 @@ func TestWebhookGithubForUser_ValidSignature_RegistryEvent_NoMatchingApp(t *test
 func TestWebhookGithubForUser_EmptyRepoName(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUserWithSecret(t, s)
 
 	payload := map[string]any{
 		"action":     "published",
@@ -176,7 +206,7 @@ func TestWebhookGithubForUser_EmptyRepoName(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	r := webhookRequest(t, "registry_package", payload, "")
+	r := webhookRequest(t, "registry_package", payload, testWebhookSecret)
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	if rec.Code != http.StatusOK {
@@ -192,11 +222,13 @@ func TestWebhookGithubForUser_EmptyRepoName(t *testing.T) {
 func TestWebhookGithubForUser_InvalidJSON(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUserWithSecret(t, s)
 
+	body := []byte("not json")
 	rec := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/api/webhooks/github/"+testWebhookToken, bytes.NewReader([]byte("not json")))
+	r := httptest.NewRequest(http.MethodPost, "/api/webhooks/github/"+testWebhookToken, bytes.NewReader(body))
 	r.Header.Set("X-GitHub-Event", "registry_package")
+	r.Header.Set("X-Hub-Signature-256", signBody(testWebhookSecret, body))
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	if rec.Code != http.StatusBadRequest {
@@ -207,7 +239,7 @@ func TestWebhookGithubForUser_InvalidJSON(t *testing.T) {
 func TestWebhookGithubForUser_WithMatchingApp_NonRunningDeployment(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	userID := mustSetupWebhookUser(t, s)
+	userID := mustSetupWebhookUserWithSecret(t, s)
 
 	// Create a local node, app, and a pending (non-running) deployment.
 	n := &models.Node{
@@ -251,7 +283,7 @@ func TestWebhookGithubForUser_WithMatchingApp_NonRunningDeployment(t *testing.T)
 	}
 
 	rec := httptest.NewRecorder()
-	r := webhookRequest(t, "registry_package", payload, "")
+	r := webhookRequest(t, "registry_package", payload, testWebhookSecret)
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	if rec.Code != http.StatusOK {
@@ -316,11 +348,11 @@ func TestWebhookGithubForUser_SignatureVerification_ValidHMAC(t *testing.T) {
 func TestWebhookGithubForUser_PingEvent_Ignored(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUserWithSecret(t, s)
 
 	payload := map[string]any{"zen": "Keep it logically awesome."}
 	rec := httptest.NewRecorder()
-	r := webhookRequest(t, "ping", payload, "")
+	r := webhookRequest(t, "ping", payload, testWebhookSecret)
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	if rec.Code != http.StatusOK {
@@ -361,7 +393,7 @@ func TestWebhookGithubForUser_SignatureNoPrefix(t *testing.T) {
 func TestWebhookGithubForUser_ResponseIncludesRepo(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUserWithSecret(t, s)
 
 	payload := map[string]any{
 		"action": "published",
@@ -370,7 +402,7 @@ func TestWebhookGithubForUser_ResponseIncludesRepo(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	r := webhookRequest(t, "registry_package", payload, "")
+	r := webhookRequest(t, "registry_package", payload, testWebhookSecret)
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	var resp map[string]any
@@ -384,14 +416,14 @@ func TestWebhookGithubForUser_ResponseIncludesRepo(t *testing.T) {
 func TestWebhookGithubForUser_VariousIgnoredEvents(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUserWithSecret(t, s)
 
 	events := []string{"push", "pull_request", "issues", "release", "star", "fork"}
 	for _, event := range events {
 		t.Run(event, func(t *testing.T) {
 			payload := map[string]any{"action": "created"}
 			rec := httptest.NewRecorder()
-			r := webhookRequest(t, event, payload, "")
+			r := webhookRequest(t, event, payload, testWebhookSecret)
 			h.GithubForUser(rec, r, testWebhookToken)
 
 			if rec.Code != http.StatusOK {
@@ -412,11 +444,11 @@ func TestWebhookGithubForUser_VariousIgnoredEvents(t *testing.T) {
 func TestWebhookGithubForUser_ContentType(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUserWithSecret(t, s)
 
 	payload := map[string]any{"action": "published"}
 	rec := httptest.NewRecorder()
-	r := webhookRequest(t, "push", payload, "")
+	r := webhookRequest(t, "push", payload, testWebhookSecret)
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	ct := rec.Header().Get("Content-Type")
@@ -429,7 +461,7 @@ func TestWebhookGithubForUser_ContentType(t *testing.T) {
 func TestWebhookGithubForUser_LargePayload(t *testing.T) {
 	s := newTestStore(t)
 	h := handlers.NewWebhookHandler(s)
-	mustSetupWebhookUser(t, s)
+	mustSetupWebhookUserWithSecret(t, s)
 
 	// Build a payload with a large field.
 	payload := map[string]any{
@@ -440,7 +472,7 @@ func TestWebhookGithubForUser_LargePayload(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	r := webhookRequest(t, "registry_package", payload, "")
+	r := webhookRequest(t, "registry_package", payload, testWebhookSecret)
 	h.GithubForUser(rec, r, testWebhookToken)
 
 	if rec.Code != http.StatusOK {

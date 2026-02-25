@@ -135,7 +135,8 @@ type RunConfig struct {
 	Image         string
 	Ports         []string
 	EnvFilePath   string            // path to --env-file on the node; "" = no env file
-	Command       string
+	Command       string            // trusted raw shell fragment appended as-is (for programmatic use)
+	CommandArgs   []string          // user-supplied args: each token is individually shell-escaped
 	Network       string            // "" = no --network flag
 	Labels        map[string]string // arbitrary docker labels
 	Volumes       []string          // "volume-name:/mount/path"
@@ -182,7 +183,12 @@ func DockerRunCmd(cfg RunConfig) string {
 	sb.WriteString(" ")
 	sb.WriteString(shellEscape(cfg.Image))
 
-	if cfg.Command != "" {
+	if len(cfg.CommandArgs) > 0 {
+		for _, arg := range cfg.CommandArgs {
+			sb.WriteString(" ")
+			sb.WriteString(shellEscape(arg))
+		}
+	} else if cfg.Command != "" {
 		sb.WriteString(" ")
 		sb.WriteString(cfg.Command)
 	}

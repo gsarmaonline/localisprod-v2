@@ -63,7 +63,7 @@ func (h *CacheHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Check for port conflicts before creating the container.
 	if used, err := h.store.IsPortUsedOnNode(body.NodeID, port); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	} else if used {
 		writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already in use on this node", port))
@@ -92,7 +92,7 @@ func (h *CacheHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:     time.Now().UTC(),
 	}
 	if err := h.store.CreateCache(c, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -137,7 +137,7 @@ func (h *CacheHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	caches, err := h.store.ListCaches(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if caches == nil {
@@ -153,7 +153,7 @@ func (h *CacheHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	c, err := h.store.GetCache(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if c == nil {
@@ -170,7 +170,7 @@ func (h *CacheHandler) Delete(w http.ResponseWriter, r *http.Request, id string)
 	}
 	c, err := h.store.GetCache(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if c == nil {
@@ -184,7 +184,7 @@ func (h *CacheHandler) Delete(w http.ResponseWriter, r *http.Request, id string)
 	}
 
 	if err := h.store.DeleteCache(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

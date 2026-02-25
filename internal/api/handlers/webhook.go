@@ -40,14 +40,17 @@ func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
-	// Verify HMAC-SHA256 signature against this user's webhook_secret
+	// Verify HMAC-SHA256 signature against this user's webhook_secret.
+	// A secret must be configured — unauthenticated webhook delivery is rejected.
 	secret, _ := h.store.GetUserSetting(user.ID, "webhook_secret")
-	if secret != "" {
-		sig := r.Header.Get("X-Hub-Signature-256")
-		if !verifySignature(secret, sig, body) {
-			writeError(w, http.StatusUnauthorized, "invalid signature")
-			return
-		}
+	if secret == "" {
+		writeError(w, http.StatusUnauthorized, "webhook secret not configured")
+		return
+	}
+	sig := r.Header.Get("X-Hub-Signature-256")
+	if !verifySignature(secret, sig, body) {
+		writeError(w, http.StatusUnauthorized, "invalid signature")
+		return
 	}
 
 	// Only process registry_package events; acknowledge everything else
@@ -76,7 +79,7 @@ func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, t
 
 	apps, err := h.store.ListApplicationsByUserAndRepo(user.ID, repoFullName)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -139,7 +142,7 @@ func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, t
 				ContainerName: d.ContainerName,
 				Image:         app.DockerImage,
 				Ports:         ports,
-				Command:       app.Command,
+				CommandArgs:   strings.Fields(app.Command),
 			}
 			_ = envVars // env vars are embedded in the running container; redeploy reuses existing config
 			if app.Domain != "" {
