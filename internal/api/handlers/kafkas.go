@@ -98,16 +98,19 @@ func (h *KafkaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	_, _ = runner.Run(sshexec.DockerVolumeCreateCmd(volumeName))
 
 	// Write Kafka configuration env vars to a temp file on the node.
-	// Using bitnami/kafka in KRaft mode (no ZooKeeper).
+	// Using apache/kafka in KRaft mode (no ZooKeeper).
 	envFilePath := fmt.Sprintf("/tmp/%s.env", containerName)
 	kafkaEnv := fmt.Sprintf(
-		"KAFKA_CFG_NODE_ID=0\n"+
-			"KAFKA_CFG_PROCESS_ROLES=broker,controller\n"+
-			"KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@localhost:9093\n"+
-			"KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093\n"+
-			"KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://%s:%d\n"+
-			"KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER\n"+
-			"KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n",
+		"KAFKA_NODE_ID=1\n"+
+			"KAFKA_PROCESS_ROLES=broker,controller\n"+
+			"KAFKA_CONTROLLER_QUORUM_VOTERS=1@localhost:9093\n"+
+			"KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093\n"+
+			"KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://%s:%d\n"+
+			"KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER\n"+
+			"KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT\n"+
+			"KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1\n"+
+			"KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1\n"+
+			"KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1\n",
 		node.Host, port,
 	)
 	if err := runner.WriteFile(envFilePath, kafkaEnv); err != nil {
@@ -122,9 +125,9 @@ func (h *KafkaHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	runCfg := sshexec.RunConfig{
 		ContainerName: containerName,
-		Image:         fmt.Sprintf("bitnami/kafka:%s", version),
+		Image:         fmt.Sprintf("apache/kafka:%s", version),
 		Ports:         []string{fmt.Sprintf("%d:9092", port)},
-		Volumes:       []string{fmt.Sprintf("%s:/bitnami/kafka", volumeName)},
+		Volumes:       []string{fmt.Sprintf("%s:/var/lib/kafka/data", volumeName)},
 		EnvFilePath:   envFilePath,
 		Restart:       "unless-stopped",
 	}

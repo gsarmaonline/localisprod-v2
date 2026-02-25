@@ -249,10 +249,14 @@ func RemoveFileCmd(path string) string {
 	return fmt.Sprintf("rm -f %s", shellEscape(path))
 }
 
-// CheckPortInUseCmd returns a shell command that prints "1" if the TCP port is
-// already bound on the host, or "0" if it is free.
+// CheckPortInUseCmd returns a shell command that prints the number of LISTEN
+// entries for the given port.  The command exits non-zero when the port is free
+// (grep found no matches), which IsPortInUse treats as "not in use".  Removing
+// the trailing "|| echo 0" avoids a double-output bug on systems where ss is
+// unavailable: grep -c would exit 1 (no matches) triggering the fallback and
+// producing "0\n0" instead of "0".
 func CheckPortInUseCmd(port int) string {
-	return fmt.Sprintf("ss -tln sport = :%d 2>/dev/null | grep -c LISTEN || echo 0", port)
+	return fmt.Sprintf("ss -tln sport = :%d 2>/dev/null | grep -c LISTEN", port)
 }
 
 // IsPortInUse runs CheckPortInUseCmd on the given runner and returns true if
