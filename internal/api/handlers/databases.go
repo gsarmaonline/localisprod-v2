@@ -30,9 +30,7 @@ type dbConfig struct {
 
 var dbConfigs = map[string]dbConfig{
 	"postgres": {"16", 5432, "postgres", "/var/lib/postgresql/data"},
-	"mysql":    {"8", 3306, "mysql", "/var/lib/mysql"},
 	"redis":    {"7", 6379, "redis", "/data"},
-	"mongodb":  {"7", 27017, "mongo", "/data/db"},
 }
 
 func (h *DatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +58,7 @@ func (h *DatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	cfg, ok := dbConfigs[body.Type]
 	if !ok {
-		writeError(w, http.StatusBadRequest, "type must be one of: postgres, mysql, redis, mongodb")
+		writeError(w, http.StatusBadRequest, "type must be one of: postgres, redis")
 		return
 	}
 
@@ -249,19 +247,6 @@ func dbContainerEnvVars(dbType, dbname, dbuser, password string) map[string]stri
 			"POSTGRES_USER":     dbuser,
 			"POSTGRES_PASSWORD": password,
 		}
-	case "mysql":
-		return map[string]string{
-			"MYSQL_DATABASE":      dbname,
-			"MYSQL_USER":          dbuser,
-			"MYSQL_PASSWORD":      password,
-			"MYSQL_ROOT_PASSWORD": password,
-		}
-	case "mongodb":
-		return map[string]string{
-			"MONGO_INITDB_DATABASE":      dbname,
-			"MONGO_INITDB_ROOT_USERNAME": dbuser,
-			"MONGO_INITDB_ROOT_PASSWORD": password,
-		}
 	}
 	return nil // redis: password set via command
 }
@@ -280,14 +265,8 @@ func DBConnectionURL(db *models.Database) string {
 	case "postgres":
 		return fmt.Sprintf("postgres://%s:%s@%s:%d/%s",
 			db.DBUser, db.Password, db.NodeHost, db.Port, db.DBName)
-	case "mysql":
-		return fmt.Sprintf("mysql://%s:%s@%s:%d/%s",
-			db.DBUser, db.Password, db.NodeHost, db.Port, db.DBName)
 	case "redis":
 		return fmt.Sprintf("redis://:%s@%s:%d", db.Password, db.NodeHost, db.Port)
-	case "mongodb":
-		return fmt.Sprintf("mongodb://%s:%s@%s:%d/%s",
-			db.DBUser, db.Password, db.NodeHost, db.Port, db.DBName)
 	}
 	return ""
 }
