@@ -37,7 +37,6 @@ tmp/
 cluster.db
 web/node_modules/
 web/dist/
-web/screenshots/
 
 # Tests
 tests/node_modules/
