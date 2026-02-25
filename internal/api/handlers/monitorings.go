@@ -215,8 +215,11 @@ func (h *MonitoringHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	now := time.Now().UTC()
 	_ = h.store.UpdateMonitoringStatus(m.ID, userID, "running")
+	_ = h.store.UpdateMonitoringLastDeployedAt(m.ID, userID, now)
 	m.Status = "running"
+	m.LastDeployedAt = &now
 	writeJSON(w, http.StatusCreated, m)
 }
 

@@ -47,67 +47,71 @@ type Application struct {
 }
 
 type Monitoring struct {
-	ID                      string    `json:"id"`
-	Name                    string    `json:"name"`
-	NodeID                  string    `json:"node_id"`
-	PrometheusPort          int       `json:"prometheus_port"`
-	GrafanaPort             int       `json:"grafana_port"`
-	GrafanaPassword         string    `json:"grafana_password,omitempty"`
-	PrometheusContainerName string    `json:"prometheus_container_name"`
-	GrafanaContainerName    string    `json:"grafana_container_name"`
-	Status                  string    `json:"status"`
-	UserID                  string    `json:"user_id,omitempty"`
-	CreatedAt               time.Time `json:"created_at"`
+	ID                      string     `json:"id"`
+	Name                    string     `json:"name"`
+	NodeID                  string     `json:"node_id"`
+	PrometheusPort          int        `json:"prometheus_port"`
+	GrafanaPort             int        `json:"grafana_port"`
+	GrafanaPassword         string     `json:"grafana_password,omitempty"`
+	PrometheusContainerName string     `json:"prometheus_container_name"`
+	GrafanaContainerName    string     `json:"grafana_container_name"`
+	Status                  string     `json:"status"`
+	UserID                  string     `json:"user_id,omitempty"`
+	CreatedAt               time.Time  `json:"created_at"`
+	LastDeployedAt          *time.Time `json:"last_deployed_at,omitempty"`
 	// Joined fields
 	NodeHost string `json:"node_host,omitempty"`
 	NodeName string `json:"node_name,omitempty"`
 }
 
 type Cache struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Version       string    `json:"version"`
-	NodeID        string    `json:"node_id"`
-	Password      string    `json:"password,omitempty"`
-	Port          int       `json:"port"`
-	ContainerName string    `json:"container_name"`
-	Status        string    `json:"status"`
-	UserID        string    `json:"user_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	Version        string     `json:"version"`
+	NodeID         string     `json:"node_id"`
+	Password       string     `json:"password,omitempty"`
+	Port           int        `json:"port"`
+	ContainerName  string     `json:"container_name"`
+	Status         string     `json:"status"`
+	UserID         string     `json:"user_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastDeployedAt *time.Time `json:"last_deployed_at,omitempty"`
 	// Joined fields
 	NodeHost string `json:"node_host,omitempty"`
 	NodeName string `json:"node_name,omitempty"`
 }
 
 type Kafka struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Version       string    `json:"version"`
-	NodeID        string    `json:"node_id"`
-	Port          int       `json:"port"`
-	ContainerName string    `json:"container_name"`
-	Status        string    `json:"status"`
-	UserID        string    `json:"user_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	Version        string     `json:"version"`
+	NodeID         string     `json:"node_id"`
+	Port           int        `json:"port"`
+	ContainerName  string     `json:"container_name"`
+	Status         string     `json:"status"`
+	UserID         string     `json:"user_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastDeployedAt *time.Time `json:"last_deployed_at,omitempty"`
 	// Joined fields
 	NodeHost string `json:"node_host,omitempty"`
 	NodeName string `json:"node_name,omitempty"`
 }
 
 type Database struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Type          string    `json:"type"`    // postgres, mysql, redis, mongodb
-	Version       string    `json:"version"`
-	NodeID        string    `json:"node_id"`
-	DBName        string    `json:"dbname"`
-	DBUser        string    `json:"db_user"`
-	Password      string    `json:"password,omitempty"`
-	Port          int       `json:"port"`
-	ContainerName string    `json:"container_name"`
-	Status        string    `json:"status"`
-	UserID        string    `json:"user_id,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             string     `json:"id"`
+	Name           string     `json:"name"`
+	Type           string     `json:"type"`    // postgres, mysql, redis, mongodb
+	Version        string     `json:"version"`
+	NodeID         string     `json:"node_id"`
+	DBName         string     `json:"dbname"`
+	DBUser         string     `json:"db_user"`
+	Password       string     `json:"password,omitempty"`
+	Port           int        `json:"port"`
+	ContainerName  string     `json:"container_name"`
+	Status         string     `json:"status"`
+	UserID         string     `json:"user_id,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	LastDeployedAt *time.Time `json:"last_deployed_at,omitempty"`
 	// Joined fields
 	NodeHost string `json:"node_host,omitempty"`
 	NodeName string `json:"node_name,omitempty"`

@@ -116,6 +116,7 @@ export interface Database {
   container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateDatabaseInput {
@@ -150,6 +151,7 @@ export interface Cache {
   container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateCacheInput {
@@ -181,6 +183,7 @@ export interface Kafka {
   container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateKafkaInput {
@@ -212,6 +215,7 @@ export interface Monitoring {
   grafana_container_name: string
   status: string
   created_at: string
+  last_deployed_at?: string
 }
 
 export interface CreateMonitoringInput {

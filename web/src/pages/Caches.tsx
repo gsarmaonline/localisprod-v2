@@ -91,13 +91,14 @@ export default function Caches() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Connection</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Env Var</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Started At</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {cacheList.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No caches yet</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No caches yet</td>
               </tr>
             )}
             {cacheList.map(c => (
@@ -118,6 +119,7 @@ export default function Caches() {
                 <td className="px-4 py-3">
                   <StatusBadge status={c.status} />
                 </td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{c.last_deployed_at ? new Date(c.last_deployed_at).toLocaleString() : '—'}</td>
                 <td className="px-4 py-3">
                   <button
                     onClick={() => handleDelete(c.id)}

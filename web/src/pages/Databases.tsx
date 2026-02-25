@@ -108,13 +108,14 @@ export default function Databases() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Connection</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Env Var</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Started At</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {dbList.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No databases yet</td>
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">No databases yet</td>
               </tr>
             )}
             {dbList.map(db => (
@@ -135,6 +136,7 @@ export default function Databases() {
                 <td className="px-4 py-3">
                   <StatusBadge status={db.status} />
                 </td>
+                <td className="px-4 py-3 text-gray-500 text-xs">{db.last_deployed_at ? new Date(db.last_deployed_at).toLocaleString() : '—'}</td>
                 <td className="px-4 py-3">
                   <button
                     onClick={() => handleDelete(db.id)}
