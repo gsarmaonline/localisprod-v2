@@ -103,6 +103,7 @@ CREATE TABLE IF NOT EXISTS applications (
   databases TEXT NOT NULL DEFAULT '[]',
   caches TEXT NOT NULL DEFAULT '[]',
   kafkas TEXT NOT NULL DEFAULT '[]',
+  monitorings TEXT NOT NULL DEFAULT '[]',
   user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

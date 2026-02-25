@@ -210,6 +210,7 @@ export default function Applications() {
       databases: [],
       caches: [],
       kafkas: [],
+      monitorings: [],
     })
     setShowCreate(true)
   }
