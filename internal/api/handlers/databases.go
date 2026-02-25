@@ -91,7 +91,7 @@ func (h *DatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// Check for port conflicts before creating the container.
 	if used, err := h.store.IsPortUsedOnNode(body.NodeID, port); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	} else if used {
 		writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already in use on this node", port))
@@ -123,7 +123,7 @@ func (h *DatabaseHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:     time.Now().UTC(),
 	}
 	if err := h.store.CreateDatabase(db, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -201,7 +201,7 @@ func (h *DatabaseHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	dbs, err := h.store.ListDatabases(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if dbs == nil {
@@ -217,7 +217,7 @@ func (h *DatabaseHandler) Get(w http.ResponseWriter, r *http.Request, id string)
 	}
 	db, err := h.store.GetDatabase(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if db == nil {
@@ -234,7 +234,7 @@ func (h *DatabaseHandler) Delete(w http.ResponseWriter, r *http.Request, id stri
 	}
 	db, err := h.store.GetDatabase(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if db == nil {
@@ -248,7 +248,7 @@ func (h *DatabaseHandler) Delete(w http.ResponseWriter, r *http.Request, id stri
 	}
 
 	if err := h.store.DeleteDatabase(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

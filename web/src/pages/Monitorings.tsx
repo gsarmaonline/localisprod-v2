@@ -105,24 +105,32 @@ export default function Monitorings() {
                 <td className="px-4 py-3 font-medium">{m.name}</td>
                 <td className="px-4 py-3 text-gray-600">{m.node_name}</td>
                 <td className="px-4 py-3">
-                  <a
-                    href={`http://${m.node_host}:${m.prometheus_port}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-xs text-teal-700 hover:underline"
-                  >
-                    {m.node_host}:{m.prometheus_port}
-                  </a>
+                  {isSafeHost(m.node_host) ? (
+                    <a
+                      href={`http://${m.node_host}:${m.prometheus_port}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-xs text-teal-700 hover:underline"
+                    >
+                      {m.node_host}:{m.prometheus_port}
+                    </a>
+                  ) : (
+                    <span className="font-mono text-xs text-gray-400">{m.node_host}:{m.prometheus_port}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
-                  <a
-                    href={`http://${m.node_host}:${m.grafana_port}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-xs text-teal-700 hover:underline"
-                  >
-                    {m.node_host}:{m.grafana_port}
-                  </a>
+                  {isSafeHost(m.node_host) ? (
+                    <a
+                      href={`http://${m.node_host}:${m.grafana_port}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-xs text-teal-700 hover:underline"
+                    >
+                      {m.node_host}:{m.grafana_port}
+                    </a>
+                  ) : (
+                    <span className="font-mono text-xs text-gray-400">{m.node_host}:{m.grafana_port}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={m.status} />
@@ -244,4 +252,8 @@ export default function Monitorings() {
 
 function envVarName(name: string, suffix: string): string {
   return name.toUpperCase().replace(/[-\s.]/g, '_') + '_' + suffix + '_URL'
+}
+
+function isSafeHost(host: string): boolean {
+  return /^[a-zA-Z0-9.\-]+$/.test(host)
 }

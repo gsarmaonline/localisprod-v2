@@ -23,37 +23,37 @@ func (h *SettingsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	username, err := h.store.GetUserSetting(userID, "github_username")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	token, err := h.store.GetUserSetting(userID, "github_token")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	webhookSecret, err := h.store.GetUserSetting(userID, "webhook_secret")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	webhookToken, err := h.store.GetUserSetting(userID, "webhook_token")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	doToken, err := h.store.GetUserSetting(userID, "do_api_token")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	awsKeyID, err := h.store.GetUserSetting(userID, "aws_access_key_id")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	awsSecret, err := h.store.GetUserSetting(userID, "aws_secret_access_key")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -109,36 +109,36 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.SetUserSetting(userID, "github_username", body.GithubUsername); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if body.GithubToken != "" {
 		if err := h.store.SetUserSetting(userID, "github_token", body.GithubToken); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		}
 	}
 	if body.WebhookSecret != "" {
 		if err := h.store.SetUserSetting(userID, "webhook_secret", body.WebhookSecret); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		}
 	}
 	if body.DOAPIToken != "" {
 		if err := h.store.SetUserSetting(userID, "do_api_token", body.DOAPIToken); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		}
 	}
 	if body.AWSAccessKeyID != "" {
 		if err := h.store.SetUserSetting(userID, "aws_access_key_id", body.AWSAccessKeyID); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		}
 	}
 	if body.AWSSecretAccessKey != "" {
 		if err := h.store.SetUserSetting(userID, "aws_secret_access_key", body.AWSSecretAccessKey); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		}
 	}

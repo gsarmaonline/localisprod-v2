@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"time"
 
@@ -61,13 +62,15 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 
 	userInfo, err := h.oauth.Exchange(r.Context(), code)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "oauth exchange failed: "+err.Error())
+		log.Printf("oauth exchange failed: %v", err)
+		writeError(w, http.StatusInternalServerError, "authentication failed")
 		return
 	}
 
 	user, err := h.store.UpsertUser(userInfo.Sub, userInfo.Email, userInfo.Name, userInfo.Picture)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to upsert user: "+err.Error())
+		log.Printf("failed to upsert user: %v", err)
+		writeError(w, http.StatusInternalServerError, "authentication failed")
 		return
 	}
 
@@ -83,6 +86,7 @@ func (h *AuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		Value:    tokenStr,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(30 * 24 * time.Hour),
 	})

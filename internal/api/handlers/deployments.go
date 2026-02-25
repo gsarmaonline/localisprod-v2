@@ -69,8 +69,12 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		if _, scanErr := fmt.Sscanf(hostPort, "%d", &port); scanErr != nil || port == 0 {
 			continue
 		}
+		if port < 1 || port > 65535 {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid port %d: must be between 1 and 65535", port))
+			return
+		}
 		if used, err := h.store.IsPortUsedOnNode(body.NodeID, port); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		} else if used {
 			writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already in use on this node", port))
@@ -95,7 +99,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:     time.Now().UTC(),
 	}
 	if err := h.store.CreateDeployment(deployment, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -250,7 +254,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Image:         app.DockerImage,
 		Ports:         ports,
 		EnvFilePath:   envFilePath,
-		Command:       app.Command,
+		CommandArgs:   strings.Fields(app.Command),
 	}
 
 	if app.Domain != "" {
@@ -303,7 +307,7 @@ func (h *DeploymentHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	deployments, err := h.store.ListDeployments(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if deployments == nil {
@@ -319,7 +323,7 @@ func (h *DeploymentHandler) Get(w http.ResponseWriter, r *http.Request, id strin
 	}
 	d, err := h.store.GetDeployment(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if d == nil {
@@ -336,7 +340,7 @@ func (h *DeploymentHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 	}
 	d, err := h.store.GetDeployment(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if d == nil {
@@ -351,7 +355,7 @@ func (h *DeploymentHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 	}
 
 	if err := h.store.DeleteDeployment(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

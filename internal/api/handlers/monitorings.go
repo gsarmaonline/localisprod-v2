@@ -66,7 +66,7 @@ func (h *MonitoringHandler) Create(w http.ResponseWriter, r *http.Request) {
 	runner := sshexec.NewRunner(node)
 	for _, port := range []int{body.PrometheusPort, body.GrafanaPort} {
 		if used, err := h.store.IsPortUsedOnNode(body.NodeID, port); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		} else if used {
 			writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already in use on this node", port))
@@ -100,7 +100,7 @@ func (h *MonitoringHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:               time.Now().UTC(),
 	}
 	if err := h.store.CreateMonitoring(m, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -230,7 +230,7 @@ func (h *MonitoringHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	monitorings, err := h.store.ListMonitorings(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if monitorings == nil {
@@ -246,7 +246,7 @@ func (h *MonitoringHandler) Get(w http.ResponseWriter, r *http.Request, id strin
 	}
 	m, err := h.store.GetMonitoring(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if m == nil {
@@ -263,7 +263,7 @@ func (h *MonitoringHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 	}
 	m, err := h.store.GetMonitoring(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if m == nil {
@@ -283,7 +283,7 @@ func (h *MonitoringHandler) Delete(w http.ResponseWriter, r *http.Request, id st
 	}
 
 	if err := h.store.DeleteMonitoring(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -67,7 +67,7 @@ func (h *NodeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:  time.Now().UTC(),
 	}
 	if err := h.store.CreateNode(node, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	node.PrivateKey = ""
@@ -81,7 +81,7 @@ func (h *NodeHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	nodes, err := h.store.ListNodes(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if isRoot(r) {
@@ -106,7 +106,7 @@ func (h *NodeHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	node, err := h.store.GetNodeForUser(id, userID, isRoot(r))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if node == nil {
@@ -128,7 +128,7 @@ func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request, id string) 
 	}
 	node, err := h.store.GetNode(id, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if node == nil {
@@ -136,7 +136,7 @@ func (h *NodeHandler) Delete(w http.ResponseWriter, r *http.Request, id string) 
 		return
 	}
 	if err := h.store.DeleteNode(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -149,7 +149,7 @@ func (h *NodeHandler) SetupTraefik(w http.ResponseWriter, r *http.Request, id st
 	}
 	node, err := h.store.GetNodeForUser(id, userID, isRoot(r))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if node == nil {
@@ -182,7 +182,7 @@ func (h *NodeHandler) Ping(w http.ResponseWriter, r *http.Request, id string) {
 	}
 	node, err := h.store.GetNodeForUser(id, userID, isRoot(r))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if node == nil {

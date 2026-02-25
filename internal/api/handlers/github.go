@@ -31,7 +31,7 @@ func (h *GithubHandler) ListRepos(w http.ResponseWriter, r *http.Request) {
 	}
 	token, err := h.store.GetUserSetting(userID, "github_token")
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if token == "" {
@@ -41,7 +41,7 @@ func (h *GithubHandler) ListRepos(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequest("GET", "https://api.github.com/user/repos?type=all&per_page=100&sort=updated", nil)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
