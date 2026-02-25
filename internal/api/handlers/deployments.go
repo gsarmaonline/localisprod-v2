@@ -175,6 +175,32 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Inject monitoring URLs from linked monitoring stacks
+	var monitoringIDs []string
+	_ = json.Unmarshal([]byte(app.Monitorings), &monitoringIDs)
+	for _, mID := range monitoringIDs {
+		mon, err := h.store.GetMonitoring(mID, userID)
+		if err != nil || mon == nil {
+			continue
+		}
+		if envVars == nil {
+			envVars = map[string]string{}
+		}
+		envVars[MonitoringPrometheusEnvVarName(mon.Name)] = MonitoringPrometheusURL(mon)
+		envVars[MonitoringGrafanaEnvVarName(mon.Name)] = MonitoringGrafanaURL(mon)
+	}
+	// For single-monitoring apps, also inject convenience aliases.
+	if len(monitoringIDs) == 1 {
+		mon, err := h.store.GetMonitoring(monitoringIDs[0], userID)
+		if err == nil && mon != nil {
+			if _, exists := envVars["PROMETHEUS_URL"]; !exists {
+				envVars["PROMETHEUS_URL"] = MonitoringPrometheusURL(mon)
+			}
+			if _, exists := envVars["GRAFANA_URL"]; !exists {
+				envVars["GRAFANA_URL"] = MonitoringGrafanaURL(mon)
+			}
+		}
+	}
 
 	// If image is from ghcr.io, authenticate first
 	if strings.HasPrefix(app.DockerImage, "ghcr.io/") {

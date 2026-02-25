@@ -75,9 +75,10 @@ export interface Application {
   command: string
   github_repo: string
   domain: string
-  databases: string // JSON string — array of database IDs
-  caches: string    // JSON string — array of cache IDs
-  kafkas: string    // JSON string — array of kafka cluster IDs
+  databases: string    // JSON string — array of database IDs
+  caches: string       // JSON string — array of cache IDs
+  kafkas: string       // JSON string — array of kafka cluster IDs
+  monitorings: string  // JSON string — array of monitoring stack IDs
   created_at: string
 }
 
@@ -93,6 +94,7 @@ export interface CreateApplicationInput {
   databases?: string[]
   caches?: string[]
   kafkas?: string[]
+  monitorings?: string[]
 }
 
 // Databases
@@ -191,6 +193,38 @@ export const kafkas = {
     request<Kafka>('/kafkas', { method: 'POST', body: JSON.stringify(data) }),
   delete: (id: string) =>
     request<void>(`/kafkas/${id}`, { method: 'DELETE' }),
+}
+
+// Monitorings
+export interface Monitoring {
+  id: string
+  name: string
+  node_id: string
+  node_name: string
+  node_host: string
+  prometheus_port: number
+  grafana_port: number
+  prometheus_container_name: string
+  grafana_container_name: string
+  status: string
+  created_at: string
+}
+
+export interface CreateMonitoringInput {
+  name: string
+  node_id: string
+  prometheus_port?: number
+  grafana_port?: number
+  grafana_password: string
+}
+
+export const monitorings = {
+  list: () => request<Monitoring[]>('/monitorings'),
+  get: (id: string) => request<Monitoring>(`/monitorings/${id}`),
+  create: (data: CreateMonitoringInput) =>
+    request<Monitoring>('/monitorings', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/monitorings/${id}`, { method: 'DELETE' }),
 }
 
 export const applications = {

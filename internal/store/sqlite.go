@@ -53,6 +53,7 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN dockerfile_path TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN caches TEXT NOT NULL DEFAULT '[]'`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN kafkas TEXT NOT NULL DEFAULT '[]'`)
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN monitorings TEXT NOT NULL DEFAULT '[]'`)
 	// Multi-tenancy: add user_id to resource tables (idempotent, errors ignored)
 	_, _ = s.db.Exec(`ALTER TABLE nodes        ADD COLUMN user_id TEXT REFERENCES users(id)`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN user_id TEXT REFERENCES users(id)`)
@@ -142,6 +143,20 @@ CREATE TABLE IF NOT EXISTS kafkas (
   node_id TEXT NOT NULL REFERENCES nodes(id),
   port INTEGER NOT NULL DEFAULT 9092,
   container_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  user_id TEXT REFERENCES users(id),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS monitorings (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  node_id TEXT NOT NULL REFERENCES nodes(id),
+  prometheus_port INTEGER NOT NULL DEFAULT 9090,
+  grafana_port INTEGER NOT NULL DEFAULT 3000,
+  grafana_password TEXT NOT NULL DEFAULT '',
+  prometheus_container_name TEXT NOT NULL DEFAULT '',
+  grafana_container_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -379,16 +394,16 @@ func (s *Store) CreateApplication(a *models.Application, userID string) error {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, user_id, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.Databases, a.Caches, a.Kafkas, userID, a.CreatedAt,
+		`INSERT INTO applications (id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, userID, a.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at
 		 FROM applications WHERE user_id = ? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -397,7 +412,7 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -411,9 +426,9 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at
 		 FROM applications WHERE id = ? AND user_id = ?`, id, userID,
-	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -432,9 +447,9 @@ func (s *Store) UpdateApplication(a *models.Application, userID string) error {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`UPDATE applications SET name=?, docker_image=?, dockerfile_path=?, env_vars=?, ports=?, command=?, domain=?, databases=?, caches=?, kafkas=?
+		`UPDATE applications SET name=?, docker_image=?, dockerfile_path=?, env_vars=?, ports=?, command=?, domain=?, databases=?, caches=?, kafkas=?, monitorings=?
 		 WHERE id=? AND user_id=?`,
-		a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.Domain, a.Databases, a.Caches, a.Kafkas, a.ID, userID,
+		a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, a.ID, userID,
 	)
 	return err
 }
@@ -446,7 +461,7 @@ func (s *Store) DeleteApplication(id, userID string) error {
 
 func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, created_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at
 		 FROM applications WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
 	if err != nil {
 		return nil, err
@@ -455,7 +470,7 @@ func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*mod
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -781,7 +796,7 @@ func (s *Store) DeleteCache(id, userID string) error {
 }
 
 // IsPortUsedOnNode returns true if the port is already registered (status != 'failed')
-// on the given node across databases, caches, and kafkas tables.
+// on the given node across databases, caches, kafkas, and monitorings tables.
 func (s *Store) IsPortUsedOnNode(nodeID string, port int) (bool, error) {
 	var count int
 	err := s.db.QueryRow(`
@@ -791,8 +806,12 @@ func (s *Store) IsPortUsedOnNode(nodeID string, port int) (bool, error) {
 			SELECT port FROM caches WHERE node_id = ? AND port = ? AND status != 'failed'
 			UNION ALL
 			SELECT port FROM kafkas WHERE node_id = ? AND port = ? AND status != 'failed'
+			UNION ALL
+			SELECT prometheus_port FROM monitorings WHERE node_id = ? AND prometheus_port = ? AND status != 'failed'
+			UNION ALL
+			SELECT grafana_port FROM monitorings WHERE node_id = ? AND grafana_port = ? AND status != 'failed'
 		)
-	`, nodeID, port, nodeID, port, nodeID, port).Scan(&count)
+	`, nodeID, port, nodeID, port, nodeID, port, nodeID, port, nodeID, port).Scan(&count)
 	return count > 0, err
 }
 
@@ -901,6 +920,101 @@ func (s *Store) ListAllRunningKafkas() ([]*models.Kafka, error) {
 		kafkas = append(kafkas, k)
 	}
 	return kafkas, rows.Err()
+}
+
+// Monitorings
+
+func (s *Store) CreateMonitoring(m *models.Monitoring, userID string) error {
+	password, err := s.encryptEnvVars(m.GrafanaPassword)
+	if err != nil {
+		return fmt.Errorf("encrypt grafana_password: %w", err)
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO monitorings (id, name, node_id, prometheus_port, grafana_port, grafana_password, prometheus_container_name, grafana_container_name, status, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, m.Name, m.NodeID, m.PrometheusPort, m.GrafanaPort, password, m.PrometheusContainerName, m.GrafanaContainerName, m.Status, userID, m.CreatedAt,
+	)
+	return err
+}
+
+func (s *Store) ListMonitorings(userID string) ([]*models.Monitoring, error) {
+	rows, err := s.db.Query(`
+		SELECT m.id, m.name, m.node_id, m.prometheus_port, m.grafana_port,
+		       m.prometheus_container_name, m.grafana_container_name, m.status, m.created_at, n.host, n.name
+		FROM monitorings m
+		JOIN nodes n ON m.node_id = n.id
+		WHERE m.user_id = ?
+		ORDER BY m.created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var monitorings []*models.Monitoring
+	for rows.Next() {
+		m := &models.Monitoring{}
+		if err := rows.Scan(&m.ID, &m.Name, &m.NodeID, &m.PrometheusPort, &m.GrafanaPort,
+			&m.PrometheusContainerName, &m.GrafanaContainerName, &m.Status, &m.CreatedAt, &m.NodeHost, &m.NodeName); err != nil {
+			return nil, err
+		}
+		monitorings = append(monitorings, m)
+	}
+	return monitorings, rows.Err()
+}
+
+func (s *Store) GetMonitoring(id, userID string) (*models.Monitoring, error) {
+	m := &models.Monitoring{}
+	err := s.db.QueryRow(`
+		SELECT m.id, m.name, m.node_id, m.prometheus_port, m.grafana_port, m.grafana_password,
+		       m.prometheus_container_name, m.grafana_container_name, m.status, m.created_at, n.host, n.name
+		FROM monitorings m
+		JOIN nodes n ON m.node_id = n.id
+		WHERE m.id = ? AND m.user_id = ?`, id, userID,
+	).Scan(&m.ID, &m.Name, &m.NodeID, &m.PrometheusPort, &m.GrafanaPort, &m.GrafanaPassword,
+		&m.PrometheusContainerName, &m.GrafanaContainerName, &m.Status, &m.CreatedAt, &m.NodeHost, &m.NodeName)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var decErr error
+	if m.GrafanaPassword, decErr = s.decryptEnvVars(m.GrafanaPassword); decErr != nil {
+		return nil, fmt.Errorf("decrypt grafana_password for %s: %w", id, decErr)
+	}
+	return m, nil
+}
+
+func (s *Store) UpdateMonitoringStatus(id, userID, status string) error {
+	_, err := s.db.Exec(`UPDATE monitorings SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
+	return err
+}
+
+func (s *Store) DeleteMonitoring(id, userID string) error {
+	_, err := s.db.Exec(`DELETE FROM monitorings WHERE id = ? AND user_id = ?`, id, userID)
+	return err
+}
+
+// ListAllRunningMonitorings returns every monitoring stack with status="running" across all users.
+// Used by the background poller to health-check containers.
+func (s *Store) ListAllRunningMonitorings() ([]*models.Monitoring, error) {
+	rows, err := s.db.Query(`
+		SELECT id, prometheus_container_name, node_id, user_id
+		FROM monitorings
+		WHERE status = 'running' AND user_id IS NOT NULL
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var monitorings []*models.Monitoring
+	for rows.Next() {
+		m := &models.Monitoring{}
+		if err := rows.Scan(&m.ID, &m.PrometheusContainerName, &m.NodeID, &m.UserID); err != nil {
+			return nil, err
+		}
+		monitorings = append(monitorings, m)
+	}
+	return monitorings, rows.Err()
 }
 
 // Settings (global, kept for legacy; prefer user settings)

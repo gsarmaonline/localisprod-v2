@@ -5,7 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faGaugeHigh, faServer, faBoxOpen, faBolt, faGear,
-  faBars, faXmark, faDatabase, faMemory, faStream,
+  faBars, faXmark, faDatabase, faMemory, faStream, faChartLine,
 } from '@fortawesome/free-solid-svg-icons'
 import Dashboard from './pages/Dashboard'
 import Nodes from './pages/Nodes'
@@ -13,6 +13,7 @@ import Applications from './pages/Applications'
 import Databases from './pages/Databases'
 import Caches from './pages/Caches'
 import Kafkas from './pages/Kafkas'
+import Monitorings from './pages/Monitorings'
 import Deployments from './pages/Deployments'
 import Settings from './pages/Settings'
 import Login from './pages/Login'
@@ -24,6 +25,7 @@ const navItems = [
   { to: '/databases', label: 'Databases', icon: faDatabase },
   { to: '/caches', label: 'Cache', icon: faMemory },
   { to: '/kafkas', label: 'Kafka', icon: faStream },
+  { to: '/monitorings', label: 'Monitoring', icon: faChartLine },
   { to: '/deployments', label: 'Deployments', icon: faBolt },
   { to: '/settings', label: 'Settings', icon: faGear },
 ]
@@ -111,6 +113,7 @@ function AppLayout() {
             <Route path="/databases" element={<Databases />} />
             <Route path="/caches" element={<Caches />} />
             <Route path="/kafkas" element={<Kafkas />} />
+            <Route path="/monitorings" element={<Monitorings />} />
             <Route path="/deployments" element={<Deployments />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>

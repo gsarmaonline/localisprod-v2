@@ -16,6 +16,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	dbH := handlers.NewDatabaseHandler(s)
 	cacheH := handlers.NewCacheHandler(s)
 	kafkaH := handlers.NewKafkaHandler(s)
+	monitoringH := handlers.NewMonitoringHandler(s)
 	dashH := handlers.NewDashboardHandler(s)
 	settingsH := handlers.NewSettingsHandler(s, appURL)
 	githubH := handlers.NewGithubHandler(s)
@@ -257,6 +258,35 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 			kafkaH.Get(w, r, id)
 		case http.MethodDelete:
 			kafkaH.Delete(w, r, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Monitorings
+	protectedMux.HandleFunc("/api/monitorings", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			monitoringH.List(w, r)
+		case http.MethodPost:
+			monitoringH.Create(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	protectedMux.HandleFunc("/api/monitorings/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/monitorings/")
+		id := strings.TrimSuffix(path, "/")
+		if id == "" {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			monitoringH.Get(w, r, id)
+		case http.MethodDelete:
+			monitoringH.Delete(w, r, id)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
