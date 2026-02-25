@@ -133,6 +133,8 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 		Ports          []string          `json:"ports"`
 		Command        string            `json:"command"`
 		Domain         string            `json:"domain"`
+		Databases      []string          `json:"databases"`
+		Caches         []string          `json:"caches"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -150,6 +152,14 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	if body.Ports == nil {
 		portsJSON = []byte("[]")
 	}
+	dbsJSON, _ := json.Marshal(body.Databases)
+	if body.Databases == nil {
+		dbsJSON = []byte("[]")
+	}
+	cachesJSON, _ := json.Marshal(body.Caches)
+	if body.Caches == nil {
+		cachesJSON = []byte("[]")
+	}
 	existing.Name = body.Name
 	existing.DockerImage = body.DockerImage
 	existing.DockerfilePath = body.DockerfilePath
@@ -157,6 +167,8 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	existing.Ports = string(portsJSON)
 	existing.Command = body.Command
 	existing.Domain = body.Domain
+	existing.Databases = string(dbsJSON)
+	existing.Caches = string(cachesJSON)
 	if err := h.store.UpdateApplication(existing, userID); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
