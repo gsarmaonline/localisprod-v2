@@ -47,6 +47,9 @@ func (s *Store) migrate() error {
 	// Idempotent: add columns to existing tables (ignored if already present)
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN is_local INTEGER NOT NULL DEFAULT 0`)
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN traefik_enabled INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN provider TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN provider_region TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN provider_instance_id TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN domain TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN databases TEXT NOT NULL DEFAULT '[]'`)
@@ -86,6 +89,9 @@ CREATE TABLE IF NOT EXISTS nodes (
   status TEXT NOT NULL DEFAULT 'unknown',
   is_local INTEGER NOT NULL DEFAULT 0,
   traefik_enabled INTEGER NOT NULL DEFAULT 0,
+  provider TEXT NOT NULL DEFAULT '',
+  provider_region TEXT NOT NULL DEFAULT '',
+  provider_instance_id TEXT NOT NULL DEFAULT '',
   user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -271,16 +277,16 @@ func (s *Store) SetUserSetting(userID, key, value string) error {
 
 func (s *Store) CreateNode(n *models.Node, userID string) error {
 	_, err := s.db.Exec(
-		`INSERT INTO nodes (id, name, host, port, username, private_key, status, is_local, traefik_enabled, user_id, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.IsLocal, n.TraefikEnabled, userID, n.CreatedAt,
+		`INSERT INTO nodes (id, name, host, port, username, private_key, status, is_local, traefik_enabled, provider, provider_region, provider_instance_id, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.ID, n.Name, n.Host, n.Port, n.Username, n.PrivateKey, n.Status, n.IsLocal, n.TraefikEnabled, n.Provider, n.ProviderRegion, n.ProviderInstanceID, userID, n.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListNodes(userID string) ([]*models.Node, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, provider, provider_region, provider_instance_id, created_at
 		 FROM nodes WHERE user_id = ? ORDER BY is_local DESC, created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -289,7 +295,7 @@ func (s *Store) ListNodes(userID string) ([]*models.Node, error) {
 	var nodes []*models.Node
 	for rows.Next() {
 		n := &models.Node{}
-		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.Provider, &n.ProviderRegion, &n.ProviderInstanceID, &n.CreatedAt); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, n)
@@ -300,9 +306,9 @@ func (s *Store) ListNodes(userID string) ([]*models.Node, error) {
 func (s *Store) GetNode(id, userID string) (*models.Node, error) {
 	n := &models.Node{}
 	err := s.db.QueryRow(
-		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, provider, provider_region, provider_instance_id, created_at
 		 FROM nodes WHERE id = ? AND user_id = ?`, id, userID,
-	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt)
+	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.Provider, &n.ProviderRegion, &n.ProviderInstanceID, &n.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -323,9 +329,9 @@ func (s *Store) EnsureManagementNode() error {
 func (s *Store) GetManagementNode() (*models.Node, error) {
 	n := &models.Node{}
 	err := s.db.QueryRow(
-		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, provider, provider_region, provider_instance_id, created_at
 		 FROM nodes WHERE id = 'management' AND is_local = 1 AND user_id IS NULL`,
-	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt)
+	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.Provider, &n.ProviderRegion, &n.ProviderInstanceID, &n.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -339,9 +345,9 @@ func (s *Store) GetNodeForUser(id, userID string, isRoot bool) (*models.Node, er
 	}
 	n := &models.Node{}
 	err := s.db.QueryRow(
-		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, provider, provider_region, provider_instance_id, created_at
 		 FROM nodes WHERE id = ? AND (user_id = ? OR (id = 'management' AND user_id IS NULL))`, id, userID,
-	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt)
+	).Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.Provider, &n.ProviderRegion, &n.ProviderInstanceID, &n.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -351,7 +357,7 @@ func (s *Store) GetNodeForUser(id, userID string, isRoot bool) (*models.Node, er
 // ListAllNodes returns every node across all users. Used by the background poller.
 func (s *Store) ListAllNodes() ([]*models.Node, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, created_at, user_id
+		`SELECT id, name, host, port, username, private_key, status, is_local, traefik_enabled, provider, provider_region, provider_instance_id, created_at, user_id
 		 FROM nodes WHERE user_id IS NOT NULL ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -360,7 +366,7 @@ func (s *Store) ListAllNodes() ([]*models.Node, error) {
 	var nodes []*models.Node
 	for rows.Next() {
 		n := &models.Node{}
-		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.CreatedAt, &n.UserID); err != nil {
+		if err := rows.Scan(&n.ID, &n.Name, &n.Host, &n.Port, &n.Username, &n.PrivateKey, &n.Status, &n.IsLocal, &n.TraefikEnabled, &n.Provider, &n.ProviderRegion, &n.ProviderInstanceID, &n.CreatedAt, &n.UserID); err != nil {
 			return nil, err
 		}
 		nodes = append(nodes, n)
