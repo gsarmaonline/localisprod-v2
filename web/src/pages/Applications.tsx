@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGithub } from '@fortawesome/free-brands-svg-icons'
-import { applications, databases, github, settings, Application, Database, CreateApplicationInput, GithubRepo } from '../api/client'
+import { applications, databases, caches, github, settings, Application, Database, Cache, CreateApplicationInput, GithubRepo } from '../api/client'
 import Modal from '../components/Modal'
 
 export default function Applications() {
   const [appList, setAppList] = useState<Application[]>([])
   const [dbList, setDbList] = useState<Database[]>([])
+  const [cacheList, setCacheList] = useState<Cache[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showRepoPicker, setShowRepoPicker] = useState(false)
@@ -25,18 +26,20 @@ export default function Applications() {
     envPairs: { key: string; value: string }[]
     ports: string[]
     databases: string[]
+    caches: string[]
   }>({
     name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '',
     envPairs: [{ key: '', value: '' }],
     ports: [''],
     databases: [],
+    caches: [],
   })
 
   const [showEnvPaste, setShowEnvPaste] = useState(false)
   const [envPasteText, setEnvPasteText] = useState('')
 
   const resetForm = () => {
-    setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [] })
+    setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [], caches: [] })
     setShowEnvPaste(false)
     setEnvPasteText('')
   }
@@ -64,6 +67,7 @@ export default function Applications() {
   useEffect(() => {
     load()
     databases.list().then(setDbList).catch(() => {})
+    caches.list().then(setCacheList).catch(() => {})
   }, [])
 
   const handleCreate = async () => {
@@ -83,6 +87,7 @@ export default function Applications() {
         github_repo: form.github_repo || undefined,
         domain: form.domain || undefined,
         databases: form.databases.length > 0 ? form.databases : undefined,
+        caches: form.caches.length > 0 ? form.caches : undefined,
       }
       if (editingId) {
         await applications.update(editingId, data)
@@ -116,6 +121,10 @@ export default function Applications() {
     try {
       dbs = JSON.parse(a.databases) as string[]
     } catch { /* keep default */ }
+    let cs: string[] = []
+    try {
+      cs = JSON.parse(a.caches) as string[]
+    } catch { /* keep default */ }
     setForm({
       name: a.name,
       docker_image: a.docker_image,
@@ -126,6 +135,7 @@ export default function Applications() {
       envPairs,
       ports,
       databases: dbs,
+      caches: cs,
     })
     setEditingId(a.id)
     setShowCreate(true)
@@ -178,6 +188,7 @@ export default function Applications() {
       envPairs: [{ key: '', value: '' }],
       ports: [''],
       databases: [],
+      caches: [],
     })
     setShowCreate(true)
   }
@@ -500,6 +511,52 @@ export default function Applications() {
                 <p className="mt-1 text-xs text-gray-400">
                   {form.databases.length === 1
                     ? 'DATABASE_URL is also set automatically. Add DATABASE_URL to env vars above to override it.'
+                    : 'Connection URLs are injected automatically as env vars on deploy.'}
+                </p>
+              </div>
+            )}
+
+            {/* Caches */}
+            {cacheList.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Linked Caches</label>
+                <div className="space-y-1 border rounded-lg p-2">
+                  {cacheList.map(c => {
+                    const checked = form.caches.includes(c.id)
+                    return (
+                      <label key={c.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setForm(prev => ({
+                              ...prev,
+                              caches: checked
+                                ? prev.caches.filter(id => id !== c.id)
+                                : [...prev.caches, c.id],
+                            }))
+                          }
+                          className="accent-blue-600"
+                        />
+                        <span className="font-medium">{c.name}</span>
+                        <span className="text-gray-400 text-xs">redis:{c.version}</span>
+                        {checked && (
+                          <span className="ml-auto flex items-center gap-1.5">
+                            <span className="font-mono text-xs text-blue-600">
+                              {c.name.toUpperCase().replace(/[-\s.]/g, '_')}_URL
+                            </span>
+                            {form.caches.length === 1 && (
+                              <span className="font-mono text-xs text-blue-600">· CACHE_URL</span>
+                            )}
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="mt-1 text-xs text-gray-400">
+                  {form.caches.length === 1
+                    ? 'CACHE_URL is also set automatically. Add CACHE_URL to env vars above to override it.'
                     : 'Connection URLs are injected automatically as env vars on deploy.'}
                 </p>
               </div>
