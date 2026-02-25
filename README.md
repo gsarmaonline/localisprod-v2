@@ -6,17 +6,18 @@ A cluster management system for deploying Docker containers to SSH-accessible no
 
 - **Google OAuth login** — each Google account gets an isolated workspace
 - Register SSH nodes (host, port, username, private key)
-- Define applications (Docker image, env vars, port mappings, command, linked databases/caches/Kafka clusters)
+- Define applications (Docker image, env vars, port mappings, command, linked databases/caches/Kafka clusters/monitoring stacks)
 - Provision managed **databases** (Postgres) on nodes — connection URLs auto-injected into linked app deployments
 - Provision managed **caches** (Redis) on nodes — connection URLs auto-injected into linked app deployments
 - Provision managed **Kafka** clusters (single-node KRaft, via `bitnami/kafka`) on nodes — bootstrap server addresses auto-injected into linked app deployments
+- Provision managed **monitoring stacks** (Prometheus + Grafana) on nodes — Prometheus and Grafana URLs auto-injected into linked app deployments; Grafana is pre-configured with Prometheus as the default datasource
 - Deploy applications as Docker containers onto nodes via SSH
 - View container logs, restart or stop deployments
 - Dashboard with live counts across nodes, apps, and deployment statuses
 - **GitHub webhook auto-redeploy**: automatically re-pulls and restarts containers when a new image is published to GHCR
 - **Per-user webhook URL**: each user has a personal webhook endpoint so multiple accounts can integrate with different GitHub repos
 - **Background image poller**: periodically pulls each deployment's image and redeploys automatically when a newer version is available (no webhook required)
-- **Background health reconciliation**: pings every node and `docker inspect`s every running container on a regular interval, keeping node/deployment/database/cache/Kafka status accurate in real time
+- **Background health reconciliation**: pings every node and `docker inspect`s every running container on a regular interval, keeping node/deployment/database/cache/Kafka/monitoring status accurate in real time
 
 ## Tech Stack
 
@@ -137,6 +138,10 @@ All `/api/*` routes except `/api/auth/google`, `/api/auth/google/callback`, and 
 | GET    | `/api/kafkas`                         | List Kafka clusters              |
 | GET    | `/api/kafkas/:id`                     | Get Kafka cluster                |
 | DELETE | `/api/kafkas/:id`                     | Stop + remove Kafka cluster      |
+| POST   | `/api/monitorings`                    | Provision a monitoring stack     |
+| GET    | `/api/monitorings`                    | List monitoring stacks           |
+| GET    | `/api/monitorings/:id`                | Get monitoring stack             |
+| DELETE | `/api/monitorings/:id`                | Stop + remove monitoring stack   |
 | POST   | `/api/deployments`                    | Deploy app to node               |
 | GET    | `/api/deployments`                    | List deployments                 |
 | DELETE | `/api/deployments/:id`                | Stop + remove deployment         |

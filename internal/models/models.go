@@ -30,15 +30,33 @@ type Application struct {
 	Name           string    `json:"name"`
 	DockerImage    string    `json:"docker_image"`
 	DockerfilePath string    `json:"dockerfile_path"`
-	EnvVars        string    `json:"env_vars"`   // JSON {"KEY":"VAL"}
-	Ports          string    `json:"ports"`      // JSON ["8080:80"]
+	EnvVars        string    `json:"env_vars"`    // JSON {"KEY":"VAL"}
+	Ports          string    `json:"ports"`       // JSON ["8080:80"]
 	Command        string    `json:"command"`
 	GithubRepo     string    `json:"github_repo"`
 	Domain         string    `json:"domain"`
-	Databases      string    `json:"databases"`  // JSON ["db-id-1"]
-	Caches         string    `json:"caches"`     // JSON ["cache-id-1"]
-	Kafkas         string    `json:"kafkas"`     // JSON ["kafka-id-1"]
+	Databases      string    `json:"databases"`   // JSON ["db-id-1"]
+	Caches         string    `json:"caches"`      // JSON ["cache-id-1"]
+	Kafkas         string    `json:"kafkas"`      // JSON ["kafka-id-1"]
+	Monitorings    string    `json:"monitorings"` // JSON ["monitoring-id-1"]
 	CreatedAt      time.Time `json:"created_at"`
+}
+
+type Monitoring struct {
+	ID                      string    `json:"id"`
+	Name                    string    `json:"name"`
+	NodeID                  string    `json:"node_id"`
+	PrometheusPort          int       `json:"prometheus_port"`
+	GrafanaPort             int       `json:"grafana_port"`
+	GrafanaPassword         string    `json:"grafana_password,omitempty"`
+	PrometheusContainerName string    `json:"prometheus_container_name"`
+	GrafanaContainerName    string    `json:"grafana_container_name"`
+	Status                  string    `json:"status"`
+	UserID                  string    `json:"user_id,omitempty"`
+	CreatedAt               time.Time `json:"created_at"`
+	// Joined fields
+	NodeHost string `json:"node_host,omitempty"`
+	NodeName string `json:"node_name,omitempty"`
 }
 
 type Cache struct {
