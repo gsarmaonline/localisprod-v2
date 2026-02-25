@@ -60,6 +60,20 @@ func (h *KafkaHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check for port conflicts before creating the container.
+	if used, err := h.store.IsPortUsedOnNode(body.NodeID, port); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	} else if used {
+		writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already in use on this node", port))
+		return
+	}
+	runner := sshexec.NewRunner(node)
+	if used, _ := sshexec.IsPortInUse(runner, port); used {
+		writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already bound on the node", port))
+		return
+	}
+
 	safeName := strings.ReplaceAll(body.Name, " ", "-")
 	shortID := uuid.New().String()[:8]
 	containerName := fmt.Sprintf("localisprod-kafka-%s-%s", safeName, shortID)
@@ -79,8 +93,6 @@ func (h *KafkaHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-
-	runner := sshexec.NewRunner(node)
 
 	// Create named volume for Kafka data (idempotent)
 	_, _ = runner.Run(sshexec.DockerVolumeCreateCmd(volumeName))
