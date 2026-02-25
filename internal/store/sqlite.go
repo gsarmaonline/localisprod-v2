@@ -780,6 +780,22 @@ func (s *Store) DeleteCache(id, userID string) error {
 	return err
 }
 
+// IsPortUsedOnNode returns true if the port is already registered (status != 'failed')
+// on the given node across databases, caches, and kafkas tables.
+func (s *Store) IsPortUsedOnNode(nodeID string, port int) (bool, error) {
+	var count int
+	err := s.db.QueryRow(`
+		SELECT COUNT(*) FROM (
+			SELECT port FROM databases WHERE node_id = ? AND port = ? AND status != 'failed'
+			UNION ALL
+			SELECT port FROM caches WHERE node_id = ? AND port = ? AND status != 'failed'
+			UNION ALL
+			SELECT port FROM kafkas WHERE node_id = ? AND port = ? AND status != 'failed'
+		)
+	`, nodeID, port, nodeID, port, nodeID, port).Scan(&count)
+	return count > 0, err
+}
+
 // ListAllRunningCaches returns every cache with status="running" across all users.
 // Used by the background poller to health-check containers.
 func (s *Store) ListAllRunningCaches() ([]*models.Cache, error) {

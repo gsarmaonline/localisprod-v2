@@ -249,6 +249,23 @@ func RemoveFileCmd(path string) string {
 	return fmt.Sprintf("rm -f %s", shellEscape(path))
 }
 
+// CheckPortInUseCmd returns a shell command that prints "1" if the TCP port is
+// already bound on the host, or "0" if it is free.
+func CheckPortInUseCmd(port int) string {
+	return fmt.Sprintf("ss -tln sport = :%d 2>/dev/null | grep -c LISTEN || echo 0", port)
+}
+
+// IsPortInUse runs CheckPortInUseCmd on the given runner and returns true if
+// the port is already listening. Errors from the runner are silently ignored so
+// a missing ss binary does not block container creation.
+func IsPortInUse(runner Runner, port int) (bool, error) {
+	out, err := runner.Run(CheckPortInUseCmd(port))
+	if err != nil {
+		return false, nil
+	}
+	return strings.TrimSpace(out) != "0", nil
+}
+
 // ShellEscape wraps a string in single quotes for safe shell usage.
 func ShellEscape(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"

@@ -55,6 +55,33 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check for port conflicts on each host port declared by the application.
+	var appPorts []string
+	_ = json.Unmarshal([]byte(app.Ports), &appPorts)
+	runner := sshexec.NewRunner(node)
+	for _, mapping := range appPorts {
+		// mapping format: "hostPort:containerPort"
+		hostPort := mapping
+		if idx := strings.LastIndex(mapping, ":"); idx >= 0 {
+			hostPort = mapping[:idx]
+		}
+		var port int
+		if _, scanErr := fmt.Sscanf(hostPort, "%d", &port); scanErr != nil || port == 0 {
+			continue
+		}
+		if used, err := h.store.IsPortUsedOnNode(body.NodeID, port); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		} else if used {
+			writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already in use on this node", port))
+			return
+		}
+		if used, _ := sshexec.IsPortInUse(runner, port); used {
+			writeError(w, http.StatusConflict, fmt.Sprintf("port %d is already bound on the node", port))
+			return
+		}
+	}
+
 	shortID := uuid.New().String()[:8]
 	containerName := fmt.Sprintf("localisprod-%s-%s", strings.ReplaceAll(app.Name, " ", "-"), shortID)
 
@@ -148,7 +175,6 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	runner := sshexec.NewRunner(node)
 
 	// If image is from ghcr.io, authenticate first
 	if strings.HasPrefix(app.DockerImage, "ghcr.io/") {
