@@ -6,15 +6,17 @@ A cluster management system for deploying Docker containers to SSH-accessible no
 
 - **Google OAuth login** — each Google account gets an isolated workspace
 - Register SSH nodes (host, port, username, private key)
-- Define applications (Docker image, env vars, port mappings, command, linked databases)
-- Provision managed databases (Postgres, MySQL, Redis, MongoDB) on nodes — connection URLs auto-injected into linked app deployments
+- Define applications (Docker image, env vars, port mappings, command, linked databases/caches/Kafka clusters)
+- Provision managed **databases** (Postgres) on nodes — connection URLs auto-injected into linked app deployments
+- Provision managed **caches** (Redis) on nodes — connection URLs auto-injected into linked app deployments
+- Provision managed **Kafka** clusters (single-node KRaft, via `bitnami/kafka`) on nodes — bootstrap server addresses auto-injected into linked app deployments
 - Deploy applications as Docker containers onto nodes via SSH
 - View container logs, restart or stop deployments
 - Dashboard with live counts across nodes, apps, and deployment statuses
 - **GitHub webhook auto-redeploy**: automatically re-pulls and restarts containers when a new image is published to GHCR
 - **Per-user webhook URL**: each user has a personal webhook endpoint so multiple accounts can integrate with different GitHub repos
 - **Background image poller**: periodically pulls each deployment's image and redeploys automatically when a newer version is available (no webhook required)
-- **Background health reconciliation**: pings every node and `docker inspect`s every running container on a regular interval, keeping node/deployment/database status accurate in real time
+- **Background health reconciliation**: pings every node and `docker inspect`s every running container on a regular interval, keeping node/deployment/database/cache/Kafka status accurate in real time
 
 ## Tech Stack
 
@@ -115,15 +117,26 @@ All `/api/*` routes except `/api/auth/google`, `/api/auth/google/callback`, and 
 | POST   | `/api/auth/logout`                    | Clear session                    |
 | POST   | `/api/nodes`                          | Register a node                  |
 | GET    | `/api/nodes`                          | List nodes                       |
+| GET    | `/api/nodes/:id`                      | Get node                         |
 | DELETE | `/api/nodes/:id`                      | Delete node                      |
 | POST   | `/api/nodes/:id/ping`                 | Test SSH connectivity            |
 | POST   | `/api/applications`                   | Create application               |
 | GET    | `/api/applications`                   | List applications                |
+| GET    | `/api/applications/:id`               | Get application                  |
+| PUT    | `/api/applications/:id`               | Update application               |
 | DELETE | `/api/applications/:id`               | Delete application               |
-| POST   | `/api/databases`                      | Provision a database             |
+| POST   | `/api/databases`                      | Provision a Postgres database    |
 | GET    | `/api/databases`                      | List databases                   |
 | GET    | `/api/databases/:id`                  | Get database                     |
 | DELETE | `/api/databases/:id`                  | Stop + remove database           |
+| POST   | `/api/caches`                         | Provision a Redis cache          |
+| GET    | `/api/caches`                         | List caches                      |
+| GET    | `/api/caches/:id`                     | Get cache                        |
+| DELETE | `/api/caches/:id`                     | Stop + remove cache              |
+| POST   | `/api/kafkas`                         | Provision a Kafka cluster        |
+| GET    | `/api/kafkas`                         | List Kafka clusters              |
+| GET    | `/api/kafkas/:id`                     | Get Kafka cluster                |
+| DELETE | `/api/kafkas/:id`                     | Stop + remove Kafka cluster      |
 | POST   | `/api/deployments`                    | Deploy app to node               |
 | GET    | `/api/deployments`                    | List deployments                 |
 | DELETE | `/api/deployments/:id`                | Stop + remove deployment         |
