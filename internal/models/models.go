@@ -117,6 +117,24 @@ type Database struct {
 	NodeName string `json:"node_name,omitempty"`
 }
 
+type ObjectStorage struct {
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	Version         string     `json:"version"`
+	NodeID          string     `json:"node_id"`
+	S3Port          int        `json:"s3_port"`
+	AccessKeyID     string     `json:"access_key_id"`
+	SecretAccessKey string     `json:"secret_access_key,omitempty"`
+	ContainerName   string     `json:"container_name"`
+	Status          string     `json:"status"`
+	UserID          string     `json:"user_id,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastDeployedAt  *time.Time `json:"last_deployed_at,omitempty"`
+	// Joined fields
+	NodeHost string `json:"node_host,omitempty"`
+	NodeName string `json:"node_name,omitempty"`
+}
+
 type Deployment struct {
 	ID             string     `json:"id"`
 	ApplicationID  string     `json:"application_id"`
