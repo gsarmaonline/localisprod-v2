@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	awsprov "github.com/gsarma/localisprod-v2/internal/providers/aws"
+	doprov "github.com/gsarma/localisprod-v2/internal/providers/digitalocean"
 	"github.com/gsarma/localisprod-v2/internal/store"
 )
 
@@ -125,8 +127,19 @@ func (h *SettingsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if body.DOAPIToken != "" {
+		if err := doprov.ValidateToken(r.Context(), body.DOAPIToken); err != nil {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
 		if err := h.store.SetSecretUserSetting(userID, "do_api_token", body.DOAPIToken); err != nil {
 			writeInternalError(w, err)
+			return
+		}
+	}
+	// Validate AWS credentials when both keys are supplied together.
+	if body.AWSAccessKeyID != "" && body.AWSSecretAccessKey != "" {
+		if err := awsprov.ValidateCredentials(r.Context(), body.AWSAccessKeyID, body.AWSSecretAccessKey); err != nil {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
 			return
 		}
 	}

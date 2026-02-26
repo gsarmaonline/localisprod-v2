@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
 )
@@ -194,6 +195,23 @@ func ensureSecurityGroup(ctx context.Context, ec2Client *ec2.Client) (string, er
 	}
 
 	return sgID, nil
+}
+
+// ValidateCredentials checks that the AWS credentials are valid by calling
+// STS GetCallerIdentity, which requires no special permissions.
+func ValidateCredentials(ctx context.Context, accessKey, secretKey string) error {
+	cfg, err := config.LoadDefaultConfig(ctx,
+		config.WithRegion("us-east-1"),
+		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+	)
+	if err != nil {
+		return fmt.Errorf("load AWS config: %w", err)
+	}
+	_, err = sts.NewFromConfig(cfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return fmt.Errorf("AWS credentials validation failed: %w", err)
+	}
+	return nil
 }
 
 // ProvisionInstance creates an EC2 instance, waits for it to be running,
