@@ -208,7 +208,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	// If image is from ghcr.io, authenticate first
 	if strings.HasPrefix(app.DockerImage, "ghcr.io/") {
-		ghToken, _ := h.store.GetUserSetting(userID, "github_token")
+		ghToken, _ := h.store.GetSecretUserSetting(userID, "github_token")
 		ghUsername, _ := h.store.GetUserSetting(userID, "github_username")
 		if ghToken != "" && ghUsername != "" {
 			loginCmd := sshexec.DockerLoginCmd(ghUsername, ghToken)

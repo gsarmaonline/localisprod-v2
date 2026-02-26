@@ -286,6 +286,28 @@ func (s *Store) SetUserSetting(userID, key, value string) error {
 	return err
 }
 
+// GetSecretUserSetting retrieves a user setting and decrypts it if a cipher is configured.
+// Values stored in plaintext (legacy or no cipher) are returned as-is.
+func (s *Store) GetSecretUserSetting(userID, key string) (string, error) {
+	val, err := s.GetUserSetting(userID, key)
+	if err != nil || val == "" || s.cipher == nil {
+		return val, err
+	}
+	return s.cipher.Decrypt(val)
+}
+
+// SetSecretUserSetting encrypts the value (if a cipher is configured) and stores it.
+func (s *Store) SetSecretUserSetting(userID, key, value string) error {
+	if s.cipher != nil {
+		encrypted, err := s.cipher.Encrypt(value)
+		if err != nil {
+			return fmt.Errorf("encrypt setting %q: %w", key, err)
+		}
+		value = encrypted
+	}
+	return s.SetUserSetting(userID, key, value)
+}
+
 // Nodes
 
 func (s *Store) CreateNode(n *models.Node, userID string) error {

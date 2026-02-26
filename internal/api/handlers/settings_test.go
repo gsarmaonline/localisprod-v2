@@ -91,11 +91,11 @@ func TestSettingsUpdate_Success(t *testing.T) {
 	if username != "newuser" {
 		t.Errorf("expected stored username='newuser', got %q", username)
 	}
-	token, _ := s.GetUserSetting(testUserID, "github_token")
+	token, _ := s.GetSecretUserSetting(testUserID, "github_token")
 	if token != "newtoken" {
 		t.Errorf("expected stored token='newtoken', got %q", token)
 	}
-	webhookSecret, _ := s.GetUserSetting(testUserID, "webhook_secret")
+	webhookSecret, _ := s.GetSecretUserSetting(testUserID, "webhook_secret")
 	if webhookSecret != "newsecret" {
 		t.Errorf("expected stored webhook_secret='newsecret', got %q", webhookSecret)
 	}
@@ -123,7 +123,7 @@ func TestSettingsUpdate_EmptyWebhookSecret_NotOverwritten(t *testing.T) {
 	}
 
 	// Secret should remain unchanged.
-	secret, _ := s.GetUserSetting(testUserID, "webhook_secret")
+	secret, _ := s.GetSecretUserSetting(testUserID, "webhook_secret")
 	if secret != "existing-secret" {
 		t.Errorf("expected existing secret preserved, got %q", secret)
 	}
