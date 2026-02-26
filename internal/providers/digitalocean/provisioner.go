@@ -38,6 +38,17 @@ func newClient(token string) *godo.Client {
 	return godo.NewFromToken(token)
 }
 
+// ValidateToken checks that the DigitalOcean API token is valid by fetching
+// basic account info. Returns a descriptive error if the token is rejected.
+func ValidateToken(ctx context.Context, token string) error {
+	client := newClient(token)
+	_, _, err := client.Account.Get(ctx)
+	if err != nil {
+		return fmt.Errorf("DigitalOcean token validation failed: %w", err)
+	}
+	return nil
+}
+
 // ListRegions returns available DigitalOcean regions.
 func ListRegions(ctx context.Context, token string) ([]Region, error) {
 	client := newClient(token)
