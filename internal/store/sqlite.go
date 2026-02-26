@@ -68,6 +68,7 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE caches       ADD COLUMN last_deployed_at DATETIME`)
 	_, _ = s.db.Exec(`ALTER TABLE kafkas       ADD COLUMN last_deployed_at DATETIME`)
 	_, _ = s.db.Exec(`ALTER TABLE monitorings  ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE object_storages ADD COLUMN last_deployed_at DATETIME`)
 
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -175,6 +176,22 @@ CREATE TABLE IF NOT EXISTS monitorings (
   grafana_password TEXT NOT NULL DEFAULT '',
   prometheus_container_name TEXT NOT NULL DEFAULT '',
   grafana_container_name TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending',
+  user_id TEXT REFERENCES users(id),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  last_deployed_at DATETIME
+);
+
+CREATE TABLE IF NOT EXISTS object_storages (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  version TEXT NOT NULL DEFAULT 'v1.0.1',
+  node_id TEXT NOT NULL REFERENCES nodes(id),
+  s3_port INTEGER NOT NULL DEFAULT 3900,
+  access_key_id TEXT NOT NULL DEFAULT '',
+  secret_access_key TEXT NOT NULL DEFAULT '',
+  rpc_secret TEXT NOT NULL DEFAULT '',
+  container_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -858,7 +875,7 @@ func (s *Store) DeleteCache(id, userID string) error {
 }
 
 // IsPortUsedOnNode returns true if the port is already registered (status != 'failed')
-// on the given node across databases, caches, kafkas, and monitorings tables.
+// on the given node across databases, caches, kafkas, monitorings, and object_storages tables.
 func (s *Store) IsPortUsedOnNode(nodeID string, port int) (bool, error) {
 	var count int
 	err := s.db.QueryRow(`
@@ -872,8 +889,10 @@ func (s *Store) IsPortUsedOnNode(nodeID string, port int) (bool, error) {
 			SELECT prometheus_port FROM monitorings WHERE node_id = ? AND prometheus_port = ? AND status != 'failed'
 			UNION ALL
 			SELECT grafana_port FROM monitorings WHERE node_id = ? AND grafana_port = ? AND status != 'failed'
+			UNION ALL
+			SELECT s3_port FROM object_storages WHERE node_id = ? AND s3_port = ? AND status != 'failed'
 		)
-	`, nodeID, port, nodeID, port, nodeID, port, nodeID, port, nodeID, port).Scan(&count)
+	`, nodeID, port, nodeID, port, nodeID, port, nodeID, port, nodeID, port, nodeID, port).Scan(&count)
 	return count > 0, err
 }
 
@@ -1105,6 +1124,101 @@ func (s *Store) SetSetting(key, value string) error {
 		`INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
 		key, value,
 	)
+	return err
+}
+
+// ObjectStorages
+
+func (s *Store) CreateObjectStorage(o *models.ObjectStorage, userID, rpcSecret string) error {
+	encSecret, err := s.encryptEnvVars(rpcSecret)
+	if err != nil {
+		return fmt.Errorf("encrypt rpc_secret: %w", err)
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO object_storages (id, name, version, node_id, s3_port, access_key_id, secret_access_key, rpc_secret, container_name, status, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		o.ID, o.Name, o.Version, o.NodeID, o.S3Port, "", "", encSecret, o.ContainerName, o.Status, userID, o.CreatedAt,
+	)
+	return err
+}
+
+func (s *Store) ListObjectStorages(userID string) ([]*models.ObjectStorage, error) {
+	rows, err := s.db.Query(`
+		SELECT o.id, o.name, o.version, o.node_id, o.s3_port,
+		       o.access_key_id, o.secret_access_key, o.container_name, o.status,
+		       o.created_at, o.last_deployed_at, n.host, n.name
+		FROM object_storages o
+		JOIN nodes n ON o.node_id = n.id
+		WHERE o.user_id = ?
+		ORDER BY o.created_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []*models.ObjectStorage
+	for rows.Next() {
+		o := &models.ObjectStorage{}
+		if err := rows.Scan(&o.ID, &o.Name, &o.Version, &o.NodeID, &o.S3Port,
+			&o.AccessKeyID, &o.SecretAccessKey, &o.ContainerName, &o.Status,
+			&o.CreatedAt, &o.LastDeployedAt, &o.NodeHost, &o.NodeName); err != nil {
+			return nil, err
+		}
+		if o.SecretAccessKey, err = s.decryptEnvVars(o.SecretAccessKey); err != nil {
+			return nil, fmt.Errorf("decrypt secret_access_key for %s: %w", o.ID, err)
+		}
+		result = append(result, o)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) GetObjectStorage(id, userID string) (*models.ObjectStorage, error) {
+	o := &models.ObjectStorage{}
+	err := s.db.QueryRow(`
+		SELECT o.id, o.name, o.version, o.node_id, o.s3_port,
+		       o.access_key_id, o.secret_access_key, o.container_name, o.status,
+		       o.created_at, o.last_deployed_at, n.host, n.name
+		FROM object_storages o
+		JOIN nodes n ON o.node_id = n.id
+		WHERE o.id = ? AND o.user_id = ?`, id, userID,
+	).Scan(&o.ID, &o.Name, &o.Version, &o.NodeID, &o.S3Port,
+		&o.AccessKeyID, &o.SecretAccessKey, &o.ContainerName, &o.Status,
+		&o.CreatedAt, &o.LastDeployedAt, &o.NodeHost, &o.NodeName)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if o.SecretAccessKey, err = s.decryptEnvVars(o.SecretAccessKey); err != nil {
+		return nil, fmt.Errorf("decrypt secret_access_key for %s: %w", id, err)
+	}
+	return o, nil
+}
+
+func (s *Store) UpdateObjectStorageStatus(id, userID, status string) error {
+	_, err := s.db.Exec(`UPDATE object_storages SET status = ? WHERE id = ? AND user_id = ?`, status, id, userID)
+	return err
+}
+
+func (s *Store) UpdateObjectStorageCredentials(id, userID, accessKeyID, secretKey string) error {
+	encSecret, err := s.encryptEnvVars(secretKey)
+	if err != nil {
+		return fmt.Errorf("encrypt secret_access_key: %w", err)
+	}
+	_, err = s.db.Exec(
+		`UPDATE object_storages SET access_key_id = ?, secret_access_key = ? WHERE id = ? AND user_id = ?`,
+		accessKeyID, encSecret, id, userID,
+	)
+	return err
+}
+
+func (s *Store) UpdateObjectStorageLastDeployedAt(id, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE object_storages SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, id, userID)
+	return err
+}
+
+func (s *Store) DeleteObjectStorage(id, userID string) error {
+	_, err := s.db.Exec(`DELETE FROM object_storages WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 

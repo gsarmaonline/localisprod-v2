@@ -17,6 +17,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	cacheH := handlers.NewCacheHandler(s)
 	kafkaH := handlers.NewKafkaHandler(s)
 	monitoringH := handlers.NewMonitoringHandler(s)
+	objectStorageH := handlers.NewObjectStorageHandler(s)
 	dashH := handlers.NewDashboardHandler(s)
 	settingsH := handlers.NewSettingsHandler(s, appURL)
 	githubH := handlers.NewGithubHandler(s)
@@ -288,6 +289,35 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 			monitoringH.Get(w, r, id)
 		case http.MethodDelete:
 			monitoringH.Delete(w, r, id)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Object Storages
+	protectedMux.HandleFunc("/api/object-storages", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			objectStorageH.List(w, r)
+		case http.MethodPost:
+			objectStorageH.Create(w, r)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	protectedMux.HandleFunc("/api/object-storages/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/object-storages/")
+		id := strings.TrimSuffix(path, "/")
+		if id == "" {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			objectStorageH.Get(w, r, id)
+		case http.MethodDelete:
+			objectStorageH.Delete(w, r, id)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}

@@ -235,6 +235,39 @@ export const monitorings = {
     request<void>(`/monitorings/${id}`, { method: 'DELETE' }),
 }
 
+// Object Storages
+export interface ObjectStorage {
+  id: string
+  name: string
+  version: string
+  node_id: string
+  node_name: string
+  node_host: string
+  s3_port: number
+  access_key_id: string
+  secret_access_key?: string
+  container_name: string
+  status: string
+  created_at: string
+  last_deployed_at?: string
+}
+
+export interface CreateObjectStorageInput {
+  name: string
+  node_id: string
+  s3_port?: number
+  version?: string
+}
+
+export const objectStorages = {
+  list: () => request<ObjectStorage[]>('/object-storages'),
+  get: (id: string) => request<ObjectStorage>(`/object-storages/${id}`),
+  create: (data: CreateObjectStorageInput) =>
+    request<ObjectStorage>('/object-storages', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) =>
+    request<void>(`/object-storages/${id}`, { method: 'DELETE' }),
+}
+
 export const applications = {
   list: () => request<Application[]>('/applications'),
   get: (id: string) => request<Application>(`/applications/${id}`),
