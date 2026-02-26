@@ -29,7 +29,7 @@ func (h *GithubHandler) ListRepos(w http.ResponseWriter, r *http.Request) {
 	if userID == "" {
 		return
 	}
-	token, err := h.store.GetUserSetting(userID, "github_token")
+	token, err := h.store.GetSecretUserSetting(userID, "github_token")
 	if err != nil {
 		writeInternalError(w, err)
 		return

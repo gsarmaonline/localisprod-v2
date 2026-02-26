@@ -42,7 +42,7 @@ func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, t
 
 	// Verify HMAC-SHA256 signature against this user's webhook_secret.
 	// A secret must be configured — unauthenticated webhook delivery is rejected.
-	secret, _ := h.store.GetUserSetting(user.ID, "webhook_secret")
+	secret, _ := h.store.GetSecretUserSetting(user.ID, "webhook_secret")
 	if secret == "" {
 		writeError(w, http.StatusUnauthorized, "webhook secret not configured")
 		return
@@ -83,7 +83,7 @@ func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
-	ghToken, _ := h.store.GetUserSetting(user.ID, "github_token")
+	ghToken, _ := h.store.GetSecretUserSetting(user.ID, "github_token")
 	ghUsername, _ := h.store.GetUserSetting(user.ID, "github_username")
 
 	redeployed := 0

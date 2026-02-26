@@ -28,7 +28,7 @@ func (h *ProvidersHandler) DOMetadata(w http.ResponseWriter, r *http.Request) {
 	if userID == "" {
 		return
 	}
-	token, err := h.store.GetUserSetting(userID, "do_api_token")
+	token, err := h.store.GetSecretUserSetting(userID, "do_api_token")
 	if err != nil || token == "" {
 		writeError(w, http.StatusBadRequest, "DigitalOcean API token not configured; add it in Settings")
 		return
@@ -66,7 +66,7 @@ func (h *ProvidersHandler) DOProvision(w http.ResponseWriter, r *http.Request) {
 	if userID == "" {
 		return
 	}
-	token, err := h.store.GetUserSetting(userID, "do_api_token")
+	token, err := h.store.GetSecretUserSetting(userID, "do_api_token")
 	if err != nil || token == "" {
 		writeError(w, http.StatusBadRequest, "DigitalOcean API token not configured; add it in Settings")
 		return
@@ -138,12 +138,12 @@ func (h *ProvidersHandler) AWSProvision(w http.ResponseWriter, r *http.Request) 
 	if userID == "" {
 		return
 	}
-	accessKey, err := h.store.GetUserSetting(userID, "aws_access_key_id")
+	accessKey, err := h.store.GetSecretUserSetting(userID, "aws_access_key_id")
 	if err != nil || accessKey == "" {
 		writeError(w, http.StatusBadRequest, "AWS credentials not configured; add them in Settings")
 		return
 	}
-	secretKey, err := h.store.GetUserSetting(userID, "aws_secret_access_key")
+	secretKey, err := h.store.GetSecretUserSetting(userID, "aws_secret_access_key")
 	if err != nil || secretKey == "" {
 		writeError(w, http.StatusBadRequest, "AWS secret access key not configured; add it in Settings")
 		return
