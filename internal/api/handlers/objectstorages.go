@@ -132,7 +132,7 @@ api_bind_addr = "[::]:3903"
 
 	runCfg := sshexec.RunConfig{
 		ContainerName: containerName,
-		Image:         fmt.Sprintf("dxfleurs/garage:%s", version),
+		Image:         fmt.Sprintf("dxflrs/garage:%s", version),
 		Ports:         []string{fmt.Sprintf("%d:3900", s3Port)},
 		Volumes: []string{
 			fmt.Sprintf("/tmp/%s-meta:/var/lib/garage/meta", safeName),
@@ -160,8 +160,15 @@ api_bind_addr = "[::]:3903"
 	// Configure cluster layout.
 	nodeIDOut, nodeIDErr := runner.Run(fmt.Sprintf("docker exec %s /garage node id", sshexec.ShellEscape(containerName)))
 	if nodeIDErr == nil {
-		// Output format: "<hex-id>@<host>:<port>"
-		nodeHexID := strings.TrimSpace(strings.Split(strings.TrimSpace(nodeIDOut), "@")[0])
+		// The output of `garage node id` ends with a line of the form
+		// "<hex-id>@<host>:<port>". Scan from the end to find it.
+		var nodeHexID string
+		for _, line := range strings.Split(nodeIDOut, "\n") {
+			line = strings.TrimSpace(line)
+			if idx := strings.Index(line, "@"); idx > 0 {
+				nodeHexID = line[:idx]
+			}
+		}
 		if nodeHexID != "" {
 			_, _ = runner.Run(fmt.Sprintf("docker exec %s /garage layout assign %s --zone dc1 --capacity 1073741824",
 				sshexec.ShellEscape(containerName), sshexec.ShellEscape(nodeHexID)))
