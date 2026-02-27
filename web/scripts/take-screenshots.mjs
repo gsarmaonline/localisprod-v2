@@ -37,10 +37,59 @@ const MOCK_STATS = {
 }
 
 const MOCK_NODES = [
-  { id: '1', name: 'prod-server-1', host: '10.0.0.10', port: 22, username: 'ubuntu', status: 'online', traefik_enabled: true, provider: 'digitalocean', provider_region: 'nyc3', created_at: '2025-11-01T10:00:00Z' },
+  { id: '1', name: 'prod-server-1', host: '10.0.0.10', port: 22, username: 'ubuntu', status: 'online', traefik_enabled: true, provider: 'digitalocean', provider_region: 'nyc3', provider_instance_id: '123456789', created_at: '2025-11-01T10:00:00Z' },
   { id: '2', name: 'staging-node', host: '10.0.0.11', port: 22, username: 'ubuntu', status: 'online', traefik_enabled: false, created_at: '2025-11-15T14:20:00Z' },
-  { id: '3', name: 'worker-eu', host: '10.0.0.20', port: 22, username: 'root', status: 'offline', traefik_enabled: false, provider: 'aws', provider_region: 'eu-west-1', created_at: '2025-12-01T08:30:00Z' },
+  { id: '3', name: 'worker-eu', host: '10.0.0.20', port: 22, username: 'root', status: 'offline', traefik_enabled: false, provider: 'aws', provider_region: 'eu-west-1', provider_instance_id: 'i-0abc123def456', created_at: '2025-12-01T08:30:00Z' },
 ]
+
+const MOCK_OBJECT_STORAGES = [
+  { id: '1', name: 'media-store', version: 'v1.0.1', node_id: '1', node_name: 'prod-server-1', node_host: '10.0.0.10', s3_port: 3900, access_key_id: 'GKminio', container_name: 'localisprod-media-store-abc12345', status: 'running', created_at: '2025-12-10T10:00:00Z' },
+]
+
+const MOCK_VOLUME_MIGRATION_NONE = { error: 'no migration found for this node' }
+
+const MOCK_VOLUME_MIGRATION_COMPLETED = {
+  id: 'mig-001',
+  node_id: '1',
+  provider_volume_id: 'vol-0abc123def456789',
+  device_path: '/dev/xvdf',
+  mount_path: '/mnt/localis-data',
+  status: 'completed',
+  error: '',
+  created_at: '2026-02-20T10:00:00Z',
+  updated_at: '2026-02-20T10:12:00Z',
+}
+
+const MOCK_DO_METADATA = {
+  regions: [
+    { slug: 'nyc3', name: 'New York 3' },
+    { slug: 'sfo3', name: 'San Francisco 3' },
+    { slug: 'lon1', name: 'London 1' },
+  ],
+  sizes: [
+    { slug: 's-1vcpu-1gb', description: '1 vCPU / 1024 MB RAM / 25 GB SSD', vcpus: 1, memory_mb: 1024, disk_gb: 25, price_monthly: 6 },
+    { slug: 's-2vcpu-2gb', description: '2 vCPU / 2048 MB RAM / 60 GB SSD', vcpus: 2, memory_mb: 2048, disk_gb: 60, price_monthly: 18 },
+  ],
+  images: [
+    { slug: 'ubuntu-22-04-x64', name: 'Ubuntu 22.04 (LTS) x64' },
+    { slug: 'ubuntu-24-04-x64', name: 'Ubuntu 24.04 (LTS) x64' },
+  ],
+}
+
+const MOCK_AWS_METADATA = {
+  regions: [
+    { id: 'us-east-1', name: 'US East (N. Virginia)' },
+    { id: 'eu-west-1', name: 'Europe (Ireland)' },
+  ],
+  instance_types: [
+    { id: 't3.micro', vcpus: 2, memory_gib: 1, description: 't3.micro — 2 vCPU / 1 GiB RAM' },
+    { id: 't3.small', vcpus: 2, memory_gib: 2, description: 't3.small — 2 vCPU / 2 GiB RAM' },
+  ],
+  os_options: [
+    { id: 'ubuntu-22.04', name: 'Ubuntu 22.04 LTS' },
+    { id: 'ubuntu-24.04', name: 'Ubuntu 24.04 LTS' },
+  ],
+}
 
 const MOCK_APPS = [
   { id: '1', name: 'web-frontend', docker_image: 'nginx:1.25-alpine', dockerfile_path: '', env_vars: '{}', ports: '["80:80"]', command: '', github_repo: 'org/web-frontend', domain: 'app.example.com', databases: '[]', caches: '["1"]', kafkas: '[]', monitorings: '[]', created_at: '2025-11-05T09:00:00Z' },
@@ -93,35 +142,49 @@ function getApiPath(url) {
   }
 }
 
+// Returns either a response object { status, body } or plain data (implying 200 + JSON)
 function getMockResponse(url) {
   const p = getApiPath(url)
-  if (!p.startsWith('/api/'))             return null  // not an API call
-  if (p.startsWith('/api/auth/me'))       return MOCK_USER
-  if (p.startsWith('/api/stats'))         return MOCK_STATS
-  if (p.startsWith('/api/nodes'))         return MOCK_NODES
-  if (p.startsWith('/api/applications'))  return MOCK_APPS
-  if (p.startsWith('/api/databases'))     return MOCK_DATABASES
-  if (p.startsWith('/api/caches'))        return MOCK_CACHES
-  if (p.startsWith('/api/kafkas'))        return MOCK_KAFKAS
-  if (p.startsWith('/api/monitorings'))   return MOCK_MONITORINGS
-  if (p.startsWith('/api/deployments'))   return MOCK_DEPLOYMENTS
-  if (p.startsWith('/api/settings'))      return MOCK_SETTINGS
+  if (!p.startsWith('/api/'))                          return null  // not an API call
+  if (p === '/api/auth/me')                            return MOCK_USER
+  if (p === '/api/stats')                              return MOCK_STATS
+  if (p === '/api/nodes')                              return MOCK_NODES
+  // Node detail: /api/nodes/<id>  (no trailing segment)
+  if (/^\/api\/nodes\/[^/]+$/.test(p))                return MOCK_NODES[0]
+  // Volume migration status (no migration by default — 404)
+  if (/^\/api\/nodes\/[^/]+\/volumes\/migration$/.test(p))
+    return { __status: 404, body: MOCK_VOLUME_MIGRATION_NONE }
+  if (p === '/api/applications')                       return MOCK_APPS
+  if (p.startsWith('/api/applications'))               return MOCK_APPS[0]
+  if (p === '/api/databases')                          return MOCK_DATABASES
+  if (p === '/api/caches')                             return MOCK_CACHES
+  if (p === '/api/kafkas')                             return MOCK_KAFKAS
+  if (p === '/api/monitorings')                        return MOCK_MONITORINGS
+  if (p === '/api/object-storages')                    return MOCK_OBJECT_STORAGES
+  if (p === '/api/deployments')                        return MOCK_DEPLOYMENTS
+  if (p === '/api/settings')                           return MOCK_SETTINGS
+  if (p === '/api/providers/do/metadata')              return MOCK_DO_METADATA
+  if (p === '/api/providers/aws/metadata')             return MOCK_AWS_METADATA
   return []  // unknown API endpoint — return empty array
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 const ROUTES = [
-  { path: '/login',       name: 'login',        requiresAuth: false },
-  { path: '/',            name: 'dashboard',    requiresAuth: true  },
-  { path: '/nodes',       name: 'nodes',        requiresAuth: true  },
-  { path: '/applications',name: 'applications', requiresAuth: true  },
-  { path: '/databases',   name: 'databases',    requiresAuth: true  },
-  { path: '/caches',      name: 'caches',       requiresAuth: true  },
-  { path: '/kafkas',      name: 'kafka',        requiresAuth: true  },
-  { path: '/monitorings', name: 'monitoring',   requiresAuth: true  },
-  { path: '/deployments', name: 'deployments',  requiresAuth: true  },
-  { path: '/settings',    name: 'settings',     requiresAuth: true  },
+  { path: '/login',          name: 'login',           requiresAuth: false },
+  { path: '/',               name: 'dashboard',       requiresAuth: true  },
+  { path: '/nodes',          name: 'nodes',           requiresAuth: true  },
+  { path: '/nodes/1',        name: 'node-detail',     requiresAuth: true  },
+  { path: '/nodes/1',        name: 'node-disk',       requiresAuth: true, clickTab: 'Disk' },
+  { path: '/applications',   name: 'applications',    requiresAuth: true  },
+  { path: '/databases',      name: 'databases',       requiresAuth: true  },
+  { path: '/caches',         name: 'caches',          requiresAuth: true  },
+  { path: '/kafkas',         name: 'kafka',           requiresAuth: true  },
+  { path: '/monitorings',    name: 'monitoring',      requiresAuth: true  },
+  { path: '/object-storages',name: 'object-storages', requiresAuth: true  },
+  { path: '/deployments',    name: 'deployments',     requiresAuth: true  },
+  { path: '/providers',      name: 'providers',       requiresAuth: true  },
+  { path: '/settings',       name: 'settings',        requiresAuth: true  },
 ]
 
 const VIEWPORTS = [
@@ -197,6 +260,13 @@ async function main() {
           if (mock === null) {
             // Not an API call — pass through to Vite dev server
             req.continue()
+          } else if (mock && mock.__status) {
+            // Custom status code (e.g. 404)
+            req.respond({
+              status: mock.__status,
+              contentType: 'application/json',
+              body: JSON.stringify(mock.body),
+            })
           } else {
             req.respond({
               status: 200,
@@ -218,6 +288,13 @@ async function main() {
           )
           // Extra wait for fonts, CSS injection, and animations to settle
           await sleep(1500)
+          // Click a tab if requested (e.g. "Disk" tab on node detail page)
+          if (route.clickTab) {
+            try {
+              const tabBtn = await page.$(`button::-p-text("${route.clickTab}")`)
+              if (tabBtn) { await tabBtn.click(); await sleep(800) }
+            } catch { /* tab not found, screenshot anyway */ }
+          }
           await page.screenshot({ path: filepath, fullPage: true })
           console.log(`  ✅ ${viewport.name}/${filename}`)
           captured++
