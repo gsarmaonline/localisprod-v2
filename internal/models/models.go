@@ -35,6 +35,7 @@ type Application struct {
 	DockerfilePath string     `json:"dockerfile_path"`
 	EnvVars        string     `json:"env_vars"`    // JSON {"KEY":"VAL"}
 	Ports          string     `json:"ports"`       // JSON ["8080:80"]
+	Volumes        string     `json:"volumes"`     // JSON ["vol-name:/path"]
 	Command        string     `json:"command"`
 	GithubRepo     string     `json:"github_repo"`
 	Domain         string     `json:"domain"`
@@ -71,6 +72,7 @@ type Cache struct {
 	NodeID         string     `json:"node_id"`
 	Password       string     `json:"password,omitempty"`
 	Port           int        `json:"port"`
+	Volumes        string     `json:"volumes"` // JSON ["vol-name:/path"]
 	ContainerName  string     `json:"container_name"`
 	Status         string     `json:"status"`
 	UserID         string     `json:"user_id,omitempty"`

@@ -69,6 +69,8 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE kafkas       ADD COLUMN last_deployed_at DATETIME`)
 	_, _ = s.db.Exec(`ALTER TABLE monitorings  ADD COLUMN last_deployed_at DATETIME`)
 	_, _ = s.db.Exec(`ALTER TABLE object_storages ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN volumes TEXT NOT NULL DEFAULT '[]'`)
+	_, _ = s.db.Exec(`ALTER TABLE caches ADD COLUMN volumes TEXT NOT NULL DEFAULT '[]'`)
 
 	_, err := s.db.Exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -111,6 +113,7 @@ CREATE TABLE IF NOT EXISTS applications (
   dockerfile_path TEXT NOT NULL DEFAULT '',
   env_vars TEXT NOT NULL DEFAULT '{}',
   ports TEXT NOT NULL DEFAULT '[]',
+  volumes TEXT NOT NULL DEFAULT '[]',
   command TEXT NOT NULL DEFAULT '',
   github_repo TEXT NOT NULL DEFAULT '',
   domain TEXT NOT NULL DEFAULT '',
@@ -147,6 +150,7 @@ CREATE TABLE IF NOT EXISTS caches (
   node_id TEXT NOT NULL REFERENCES nodes(id),
   password TEXT NOT NULL DEFAULT '',
   port INTEGER NOT NULL DEFAULT 6379,
+  volumes TEXT NOT NULL DEFAULT '[]',
   container_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'pending',
   user_id TEXT REFERENCES users(id),
@@ -453,16 +457,16 @@ func (s *Store) CreateApplication(a *models.Application, userID string) error {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, user_id, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.GithubRepo, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, userID, a.CreatedAt,
+		`INSERT INTO applications (id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Volumes, a.Command, a.GithubRepo, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, userID, a.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
 		 FROM applications WHERE user_id = ? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -471,7 +475,7 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Volumes, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -485,9 +489,9 @@ func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
 func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	a := &models.Application{}
 	err := s.db.QueryRow(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
 		 FROM applications WHERE id = ? AND user_id = ?`, id, userID,
-	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt)
+	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Volumes, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -506,9 +510,9 @@ func (s *Store) UpdateApplication(a *models.Application, userID string) error {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`UPDATE applications SET name=?, docker_image=?, dockerfile_path=?, env_vars=?, ports=?, command=?, domain=?, databases=?, caches=?, kafkas=?, monitorings=?
+		`UPDATE applications SET name=?, docker_image=?, dockerfile_path=?, env_vars=?, ports=?, volumes=?, command=?, domain=?, databases=?, caches=?, kafkas=?, monitorings=?
 		 WHERE id=? AND user_id=?`,
-		a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Command, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, a.ID, userID,
+		a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Volumes, a.Command, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, a.ID, userID,
 	)
 	return err
 }
@@ -520,7 +524,7 @@ func (s *Store) DeleteApplication(id, userID string) error {
 
 func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*models.Application, error) {
 	rows, err := s.db.Query(
-		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
+		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
 		 FROM applications WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
 	if err != nil {
 		return nil, err
@@ -529,7 +533,7 @@ func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*mod
 	var apps []*models.Application
 	for rows.Next() {
 		a := &models.Application{}
-		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Volumes, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
@@ -803,9 +807,9 @@ func (s *Store) CreateCache(c *models.Cache, userID string) error {
 		return fmt.Errorf("encrypt password: %w", err)
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO caches (id, name, version, node_id, password, port, container_name, status, user_id, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.Name, c.Version, c.NodeID, password, c.Port, c.ContainerName, c.Status, userID, c.CreatedAt,
+		`INSERT INTO caches (id, name, version, node_id, password, port, volumes, container_name, status, user_id, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.Name, c.Version, c.NodeID, password, c.Port, c.Volumes, c.ContainerName, c.Status, userID, c.CreatedAt,
 	)
 	return err
 }
@@ -813,7 +817,7 @@ func (s *Store) CreateCache(c *models.Cache, userID string) error {
 func (s *Store) ListCaches(userID string) ([]*models.Cache, error) {
 	rows, err := s.db.Query(`
 		SELECT c.id, c.name, c.version, c.node_id, c.password,
-		       c.port, c.container_name, c.status, c.created_at, c.last_deployed_at, n.host, n.name
+		       c.port, c.volumes, c.container_name, c.status, c.created_at, c.last_deployed_at, n.host, n.name
 		FROM caches c
 		JOIN nodes n ON c.node_id = n.id
 		WHERE c.user_id = ?
@@ -826,7 +830,7 @@ func (s *Store) ListCaches(userID string) ([]*models.Cache, error) {
 	for rows.Next() {
 		c := &models.Cache{}
 		if err := rows.Scan(&c.ID, &c.Name, &c.Version, &c.NodeID, &c.Password,
-			&c.Port, &c.ContainerName, &c.Status, &c.CreatedAt, &c.LastDeployedAt, &c.NodeHost, &c.NodeName); err != nil {
+			&c.Port, &c.Volumes, &c.ContainerName, &c.Status, &c.CreatedAt, &c.LastDeployedAt, &c.NodeHost, &c.NodeName); err != nil {
 			return nil, err
 		}
 		if c.Password, err = s.decryptEnvVars(c.Password); err != nil {
@@ -841,12 +845,12 @@ func (s *Store) GetCache(id, userID string) (*models.Cache, error) {
 	c := &models.Cache{}
 	err := s.db.QueryRow(`
 		SELECT c.id, c.name, c.version, c.node_id, c.password,
-		       c.port, c.container_name, c.status, c.created_at, c.last_deployed_at, n.host, n.name
+		       c.port, c.volumes, c.container_name, c.status, c.created_at, c.last_deployed_at, n.host, n.name
 		FROM caches c
 		JOIN nodes n ON c.node_id = n.id
 		WHERE c.id = ? AND c.user_id = ?`, id, userID,
 	).Scan(&c.ID, &c.Name, &c.Version, &c.NodeID, &c.Password,
-		&c.Port, &c.ContainerName, &c.Status, &c.CreatedAt, &c.LastDeployedAt, &c.NodeHost, &c.NodeName)
+		&c.Port, &c.Volumes, &c.ContainerName, &c.Status, &c.CreatedAt, &c.LastDeployedAt, &c.NodeHost, &c.NodeName)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

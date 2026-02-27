@@ -16,12 +16,13 @@ export default function Caches() {
     node_id: string
     password: string
     port: string
+    volumes: string[]
   }>({
-    name: '', version: '', node_id: '', password: '', port: '',
+    name: '', version: '', node_id: '', password: '', port: '', volumes: [],
   })
 
   const resetForm = () =>
-    setForm({ name: '', version: '', node_id: '', password: '', port: '' })
+    setForm({ name: '', version: '', node_id: '', password: '', port: '', volumes: [] })
 
   const load = () =>
     caches.list().then(setCacheList).catch(e => setError(e.message))
@@ -40,6 +41,7 @@ export default function Caches() {
         password: form.password,
         version: form.version || undefined,
         port: form.port ? parseInt(form.port) : undefined,
+        volumes: form.volumes.filter(Boolean).length > 0 ? form.volumes.filter(Boolean) : undefined,
       }
       await caches.create(data)
       setShowCreate(false)
@@ -200,6 +202,34 @@ export default function Caches() {
                 value={form.password}
                 onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Volumes <span className="text-gray-400 font-normal">(optional — default: named volume at /data)</span>
+              </label>
+              {form.volumes.map((v, i) => (
+                <div key={i} className="flex gap-2 mb-1">
+                  <input
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    value={v}
+                    placeholder="vol-name:/data"
+                    onChange={e => {
+                      const volumes = [...form.volumes]
+                      volumes[i] = e.target.value
+                      setForm(prev => ({ ...prev, volumes }))
+                    }}
+                  />
+                  <button
+                    onClick={() => setForm(prev => ({ ...prev, volumes: prev.volumes.filter((_, j) => j !== i) }))}
+                    className="text-red-400 hover:text-red-600 px-2"
+                  >×</button>
+                </div>
+              ))}
+              <button
+                onClick={() => setForm(prev => ({ ...prev, volumes: [...prev.volumes, ''] }))}
+                className="text-xs text-emerald-600 hover:underline"
+              >+ Add volume</button>
             </div>
 
             <div className="flex gap-2 justify-end pt-2">

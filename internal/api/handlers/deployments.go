@@ -103,11 +103,13 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse env vars and ports
+	// Parse env vars, ports, and volumes
 	var envVars map[string]string
 	_ = json.Unmarshal([]byte(app.EnvVars), &envVars)
 	var ports []string
 	_ = json.Unmarshal([]byte(app.Ports), &ports)
+	var volumes []string
+	_ = json.Unmarshal([]byte(app.Volumes), &volumes)
 
 	// Inject database connection URLs from linked databases
 	var dbIDs []string
@@ -253,6 +255,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		ContainerName: containerName,
 		Image:         app.DockerImage,
 		Ports:         ports,
+		Volumes:       volumes,
 		EnvFilePath:   envFilePath,
 		CommandArgs:   shellFields(app.Command),
 	}
