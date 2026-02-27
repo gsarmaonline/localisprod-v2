@@ -137,6 +137,23 @@ type ObjectStorage struct {
 	NodeName string `json:"node_name,omitempty"`
 }
 
+type NodeVolumeMigration struct {
+	ID               string    `json:"id"`
+	NodeID           string    `json:"node_id"`
+	ProviderVolumeID string    `json:"provider_volume_id"`
+	DevicePath       string    `json:"device_path"`
+	MountPath        string    `json:"mount_path"`
+	Status           string    `json:"status"`
+	Error            string    `json:"error"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+// Volume migration statuses:
+// pending, provisioning, provisioned, mounted, synced,
+// stopping, renamed, symlinked, restarting, verified,
+// completed, rolling_back, rolled_back, failed
+
 type Deployment struct {
 	ID             string     `json:"id"`
 	ApplicationID  string     `json:"application_id"`

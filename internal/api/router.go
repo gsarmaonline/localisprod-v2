@@ -25,6 +25,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	authH := handlers.NewAuthHandler(s, oauthSvc, jwtSvc, appURL, rootEmail)
 	providersH := handlers.NewProvidersHandler(s)
 	composeH := handlers.NewComposeHandler(s)
+	volH := handlers.NewVolumeHandler(s)
 
 	// Unprotected mux (auth + webhooks)
 	publicMux := http.NewServeMux()
@@ -131,6 +132,34 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 			case "setup-traefik":
 				if r.Method == http.MethodPost {
 					nodeH.SetupTraefik(w, r, id)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			case "volumes/migrate":
+				if r.Method == http.MethodPost {
+					volH.Migrate(w, r, id)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			case "volumes/migration":
+				if r.Method == http.MethodGet {
+					volH.GetMigration(w, r, id)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			case "volumes/rollback":
+				if r.Method == http.MethodPost {
+					volH.Rollback(w, r, id)
+				} else {
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			case "volumes/bak":
+				if r.Method == http.MethodDelete {
+					volH.DeleteBak(w, r, id)
 				} else {
 					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 				}

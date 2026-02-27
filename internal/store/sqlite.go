@@ -221,7 +221,23 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	_, _ = s.db.Exec(`
+CREATE TABLE IF NOT EXISTS node_volume_migrations (
+  id TEXT PRIMARY KEY,
+  node_id TEXT NOT NULL REFERENCES nodes(id),
+  provider_volume_id TEXT NOT NULL DEFAULT '',
+  device_path TEXT NOT NULL DEFAULT '',
+  mount_path TEXT NOT NULL DEFAULT '/mnt/localis-data',
+  status TEXT NOT NULL DEFAULT 'pending',
+  error TEXT NOT NULL DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+`)
+	return nil
 }
 
 // Users
@@ -1224,6 +1240,100 @@ func (s *Store) UpdateObjectStorageLastDeployedAt(id, userID string, t time.Time
 func (s *Store) DeleteObjectStorage(id, userID string) error {
 	_, err := s.db.Exec(`DELETE FROM object_storages WHERE id = ? AND user_id = ?`, id, userID)
 	return err
+}
+
+// NodeVolumeMigrations
+
+func (s *Store) CreateVolumeMigration(m *models.NodeVolumeMigration) error {
+	_, err := s.db.Exec(
+		`INSERT INTO node_volume_migrations (id, node_id, provider_volume_id, device_path, mount_path, status, error, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		m.ID, m.NodeID, m.ProviderVolumeID, m.DevicePath, m.MountPath, m.Status, m.Error, m.CreatedAt, m.UpdatedAt,
+	)
+	return err
+}
+
+// GetVolumeMigration returns the most recent migration for a node.
+func (s *Store) GetVolumeMigration(nodeID string) (*models.NodeVolumeMigration, error) {
+	m := &models.NodeVolumeMigration{}
+	err := s.db.QueryRow(
+		`SELECT id, node_id, provider_volume_id, device_path, mount_path, status, error, created_at, updated_at
+		 FROM node_volume_migrations WHERE node_id = ? ORDER BY created_at DESC LIMIT 1`, nodeID,
+	).Scan(&m.ID, &m.NodeID, &m.ProviderVolumeID, &m.DevicePath, &m.MountPath, &m.Status, &m.Error, &m.CreatedAt, &m.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return m, err
+}
+
+func (s *Store) UpdateVolumeMigrationStatus(id, status, errMsg string) error {
+	_, err := s.db.Exec(
+		`UPDATE node_volume_migrations SET status = ?, error = ?, updated_at = ? WHERE id = ?`,
+		status, errMsg, time.Now().UTC(), id,
+	)
+	return err
+}
+
+func (s *Store) UpdateVolumeMigrationProviderVolume(id, volumeID, devicePath string) error {
+	_, err := s.db.Exec(
+		`UPDATE node_volume_migrations SET provider_volume_id = ?, device_path = ?, updated_at = ? WHERE id = ?`,
+		volumeID, devicePath, time.Now().UTC(), id,
+	)
+	return err
+}
+
+// ListVolumeMigrationsForCleanup returns completed migrations older than 24h.
+func (s *Store) ListVolumeMigrationsForCleanup() ([]*models.NodeVolumeMigration, error) {
+	cutoff := time.Now().UTC().Add(-24 * time.Hour)
+	rows, err := s.db.Query(
+		`SELECT id, node_id, provider_volume_id, device_path, mount_path, status, error, created_at, updated_at
+		 FROM node_volume_migrations WHERE status = 'completed' AND updated_at < ?`, cutoff,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []*models.NodeVolumeMigration
+	for rows.Next() {
+		m := &models.NodeVolumeMigration{}
+		if err := rows.Scan(&m.ID, &m.NodeID, &m.ProviderVolumeID, &m.DevicePath, &m.MountPath, &m.Status, &m.Error, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, m)
+	}
+	return result, rows.Err()
+}
+
+// ListContainerNamesByNodeID returns container names for all running containers on a node.
+func (s *Store) ListContainerNamesByNodeID(nodeID, userID string) ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT container_name FROM deployments WHERE node_id = ? AND user_id = ? AND status = 'running' AND container_name != ''
+		UNION ALL
+		SELECT container_name FROM databases WHERE node_id = ? AND user_id = ? AND status = 'running' AND container_name != ''
+		UNION ALL
+		SELECT container_name FROM caches WHERE node_id = ? AND user_id = ? AND status = 'running' AND container_name != ''
+		UNION ALL
+		SELECT container_name FROM kafkas WHERE node_id = ? AND user_id = ? AND status = 'running' AND container_name != ''
+		UNION ALL
+		SELECT prometheus_container_name FROM monitorings WHERE node_id = ? AND user_id = ? AND status = 'running' AND prometheus_container_name != ''
+		UNION ALL
+		SELECT grafana_container_name FROM monitorings WHERE node_id = ? AND user_id = ? AND status = 'running' AND grafana_container_name != ''
+		UNION ALL
+		SELECT container_name FROM object_storages WHERE node_id = ? AND user_id = ? AND status = 'running' AND container_name != ''
+	`, nodeID, userID, nodeID, userID, nodeID, userID, nodeID, userID, nodeID, userID, nodeID, userID, nodeID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
 }
 
 // EnsureLocalNode is kept but unused with multi-tenancy.
