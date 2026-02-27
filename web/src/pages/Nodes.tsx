@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { nodes, Node, CreateNodeInput } from '../api/client'
 import Modal from '../components/Modal'
 import StatusBadge from '../components/StatusBadge'
@@ -113,7 +114,9 @@ export default function Nodes() {
             )}
             {nodeList.map(n => (
               <tr key={n.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium">{n.name}</td>
+                <td className="px-4 py-3 font-medium">
+                  <Link to={`/nodes/${n.id}`} className="hover:text-indigo-600 hover:underline">{n.name}</Link>
+                </td>
                 <td className="px-4 py-3 text-gray-600">{n.host}</td>
                 <td className="px-4 py-3 text-gray-600">{n.port}</td>
                 <td className="px-4 py-3 text-gray-600">{n.username}</td>

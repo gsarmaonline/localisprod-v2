@@ -276,6 +276,76 @@ func IsPortInUse(runner Runner, port int) (bool, error) {
 	return strings.TrimSpace(out) != "0", nil
 }
 
+// MkfsAndMountCmd returns a command that formats device with ext4, mounts it at mountPath,
+// and adds an fstab entry for persistence across reboots.
+func MkfsAndMountCmd(device, mountPath string) string {
+	return strings.Join([]string{
+		"mkfs.ext4 -F " + shellEscape(device),
+		"mkdir -p " + shellEscape(mountPath),
+		"mount " + shellEscape(device) + " " + shellEscape(mountPath),
+		"echo " + shellEscape(device+" "+mountPath+" ext4 defaults 0 2") + " >> /etc/fstab",
+	}, " && ")
+}
+
+// RsyncVolumesCmd returns a command that rsyncs src to dst (both should have trailing slashes).
+func RsyncVolumesCmd(src, dst string) string {
+	return fmt.Sprintf("mkdir -p %s && rsync -a %s %s", shellEscape(dst), shellEscape(src), shellEscape(dst))
+}
+
+// StopContainersCmd returns a docker stop command for the given container names.
+// Returns "true" if names is empty (no-op).
+func StopContainersCmd(names []string) string {
+	if len(names) == 0 {
+		return "true"
+	}
+	args := make([]string, len(names))
+	for i, n := range names {
+		args[i] = shellEscape(n)
+	}
+	return "docker stop " + strings.Join(args, " ")
+}
+
+// StartContainersCmd returns a docker start command for the given container names.
+// Returns "true" if names is empty (no-op).
+func StartContainersCmd(names []string) string {
+	if len(names) == 0 {
+		return "true"
+	}
+	args := make([]string, len(names))
+	for i, n := range names {
+		args[i] = shellEscape(n)
+	}
+	return "docker start " + strings.Join(args, " ")
+}
+
+// RenameDirCmd returns a command to rename src to dst.
+func RenameDirCmd(src, dst string) string {
+	return fmt.Sprintf("mv %s %s", shellEscape(src), shellEscape(dst))
+}
+
+// CreateSymlinkCmd returns a command to create a symlink: link → target.
+func CreateSymlinkCmd(target, link string) string {
+	return fmt.Sprintf("ln -s %s %s", shellEscape(target), shellEscape(link))
+}
+
+// RemoveSymlinkCmd removes a symlink at path (safe: only removes if it is a symlink).
+func RemoveSymlinkCmd(path string) string {
+	return fmt.Sprintf("test -L %s && rm -f %s || true", shellEscape(path), shellEscape(path))
+}
+
+// CheckContainersHealthCmd returns a command that prints "true" or "false" for each container.
+// Returns "echo ok" if names is empty.
+func CheckContainersHealthCmd(names []string) string {
+	if len(names) == 0 {
+		return "echo ok"
+	}
+	args := make([]string, len(names))
+	for i, n := range names {
+		args[i] = shellEscape(n)
+	}
+	return "docker inspect --format='{{.State.Running}}' " + strings.Join(args, " ")
+}
+
 // ShellEscape wraps a string in single quotes for safe shell usage.
 func ShellEscape(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"

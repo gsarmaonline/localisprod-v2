@@ -67,6 +67,30 @@ export const nodes = {
     request<{ status: string; output: string }>(`/nodes/${id}/setup-traefik`, { method: 'POST' }),
 }
 
+// Node Volume Migration
+export interface NodeVolumeMigration {
+  id: string
+  node_id: string
+  provider_volume_id: string
+  device_path: string
+  mount_path: string
+  status: string
+  error: string
+  created_at: string
+  updated_at: string
+}
+
+export const volumeMigration = {
+  get: (nodeId: string) =>
+    request<NodeVolumeMigration>(`/nodes/${nodeId}/volumes/migration`),
+  start: (nodeId: string) =>
+    request<NodeVolumeMigration>(`/nodes/${nodeId}/volumes/migrate`, { method: 'POST' }),
+  rollback: (nodeId: string) =>
+    request<{ status: string }>(`/nodes/${nodeId}/volumes/rollback`, { method: 'POST' }),
+  deleteBak: (nodeId: string) =>
+    request<{ status: string }>(`/nodes/${nodeId}/volumes/bak`, { method: 'DELETE' }),
+}
+
 // Applications
 export interface Application {
   id: string

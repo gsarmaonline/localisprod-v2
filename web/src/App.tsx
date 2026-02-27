@@ -9,6 +9,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons'
 import Dashboard from './pages/Dashboard'
 import Nodes from './pages/Nodes'
+import NodeDetail from './pages/NodeDetail'
 import Applications from './pages/Applications'
 import Databases from './pages/Databases'
 import Caches from './pages/Caches'
@@ -113,6 +114,7 @@ function AppLayout() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/nodes" element={<Nodes />} />
+            <Route path="/nodes/:id" element={<NodeDetail />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/databases" element={<Databases />} />
             <Route path="/caches" element={<Caches />} />
