@@ -43,9 +43,9 @@ const MOCK_NODES = [
 ]
 
 const MOCK_APPS = [
-  { id: '1', name: 'web-frontend', docker_image: 'nginx:1.25-alpine', dockerfile_path: '', env_vars: '{}', ports: '["80:80"]', command: '', github_repo: 'org/web-frontend', domain: 'app.example.com', databases: '[]', caches: '["1"]', kafkas: '[]', monitorings: '[]', created_at: '2025-11-05T09:00:00Z' },
-  { id: '2', name: 'api-service', docker_image: 'node:20-alpine', dockerfile_path: 'Dockerfile', env_vars: '{"NODE_ENV":"production"}', ports: '["3000:3000"]', command: 'node dist/index.js', github_repo: 'org/api-service', domain: 'api.example.com', databases: '["1"]', caches: '[]', kafkas: '["1"]', monitorings: '["1"]', created_at: '2025-11-10T12:00:00Z' },
-  { id: '3', name: 'worker', docker_image: 'python:3.12-slim', dockerfile_path: 'Dockerfile', env_vars: '{}', ports: '[]', command: 'python worker.py', github_repo: '', domain: '', databases: '["1"]', caches: '[]', kafkas: '["1"]', monitorings: '[]', created_at: '2025-12-01T10:00:00Z' },
+  { id: '1', name: 'web-frontend', docker_image: 'nginx:1.25-alpine', dockerfile_path: '', env_vars: '{}', ports: '["80:80"]', volumes: '[]', command: '', github_repo: 'org/web-frontend', domain: 'app.example.com', databases: '[]', caches: '["1"]', kafkas: '[]', monitorings: '[]', created_at: '2025-11-05T09:00:00Z' },
+  { id: '2', name: 'api-service', docker_image: 'node:20-alpine', dockerfile_path: 'Dockerfile', env_vars: '{"NODE_ENV":"production"}', ports: '["3000:3000"]', volumes: '["app-data:/var/data"]', command: 'node dist/index.js', github_repo: 'org/api-service', domain: 'api.example.com', databases: '["1"]', caches: '[]', kafkas: '["1"]', monitorings: '["1"]', created_at: '2025-11-10T12:00:00Z' },
+  { id: '3', name: 'worker', docker_image: 'python:3.12-slim', dockerfile_path: 'Dockerfile', env_vars: '{}', ports: '[]', volumes: '[]', command: 'python worker.py', github_repo: '', domain: '', databases: '["1"]', caches: '[]', kafkas: '["1"]', monitorings: '[]', created_at: '2025-12-01T10:00:00Z' },
 ]
 
 const MOCK_DATABASES = [
@@ -54,7 +54,11 @@ const MOCK_DATABASES = [
 ]
 
 const MOCK_CACHES = [
-  { id: '1', name: 'session-cache', version: '7.2', node_id: '1', node_name: 'prod-server-1', node_host: '10.0.0.10', port: 6379, container_name: 'localisprod-session-cache-ghi90123', status: 'running', created_at: '2025-11-03T10:00:00Z' },
+  { id: '1', name: 'session-cache', version: '7.2', node_id: '1', node_name: 'prod-server-1', node_host: '10.0.0.10', port: 6379, volumes: '["session-data:/data"]', container_name: 'localisprod-session-cache-ghi90123', status: 'running', created_at: '2025-11-03T10:00:00Z' },
+]
+
+const MOCK_OBJECT_STORAGES = [
+  { id: '1', name: 'media-storage', version: 'v1.0.1', node_id: '1', node_name: 'prod-server-1', node_host: '10.0.0.10', s3_port: 3900, access_key_id: 'GKabcdef1234567890', container_name: 'localisprod-garage-media-xyz12345', status: 'running', created_at: '2025-12-10T10:00:00Z' },
 ]
 
 const MOCK_KAFKAS = [
@@ -103,9 +107,11 @@ function getMockResponse(url) {
   if (p.startsWith('/api/databases'))     return MOCK_DATABASES
   if (p.startsWith('/api/caches'))        return MOCK_CACHES
   if (p.startsWith('/api/kafkas'))        return MOCK_KAFKAS
-  if (p.startsWith('/api/monitorings'))   return MOCK_MONITORINGS
-  if (p.startsWith('/api/deployments'))   return MOCK_DEPLOYMENTS
-  if (p.startsWith('/api/settings'))      return MOCK_SETTINGS
+  if (p.startsWith('/api/monitorings'))    return MOCK_MONITORINGS
+  if (p.startsWith('/api/deployments'))    return MOCK_DEPLOYMENTS
+  if (p.startsWith('/api/object-storages')) return MOCK_OBJECT_STORAGES
+  if (p.startsWith('/api/settings'))       return MOCK_SETTINGS
+  if (p.startsWith('/api/providers'))      return {}
   return []  // unknown API endpoint — return empty array
 }
 
@@ -120,8 +126,10 @@ const ROUTES = [
   { path: '/caches',      name: 'caches',       requiresAuth: true  },
   { path: '/kafkas',      name: 'kafka',        requiresAuth: true  },
   { path: '/monitorings', name: 'monitoring',   requiresAuth: true  },
-  { path: '/deployments', name: 'deployments',  requiresAuth: true  },
-  { path: '/settings',    name: 'settings',     requiresAuth: true  },
+  { path: '/object-storages', name: 'object-storages', requiresAuth: true },
+  { path: '/deployments',     name: 'deployments',     requiresAuth: true },
+  { path: '/providers',       name: 'providers',       requiresAuth: true },
+  { path: '/settings',        name: 'settings',        requiresAuth: true },
 ]
 
 const VIEWPORTS = [
