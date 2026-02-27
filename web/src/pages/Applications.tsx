@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGithub } from '@fortawesome/free-brands-svg-icons'
-import { applications, databases, caches, kafkas, monitorings, github, settings, Application, Database, Cache, Kafka, Monitoring, CreateApplicationInput, GithubRepo } from '../api/client'
+import { applications, databases, caches, kafkas, monitorings, nodes as nodesApi, github, settings, Application, Database, Cache, Kafka, Monitoring, Node, CreateApplicationInput, GithubRepo } from '../api/client'
 import Modal from '../components/Modal'
+import ComposeImportWizard from '../components/ComposeImportWizard'
 
 export default function Applications() {
   const [appList, setAppList] = useState<Application[]>([])
@@ -10,7 +11,9 @@ export default function Applications() {
   const [cacheList, setCacheList] = useState<Cache[]>([])
   const [kafkaList, setKafkaList] = useState<Kafka[]>([])
   const [monitoringList, setMonitoringList] = useState<Monitoring[]>([])
+  const [nodeList, setNodeList] = useState<Node[]>([])
   const [showCreate, setShowCreate] = useState(false)
+  const [showComposeWizard, setShowComposeWizard] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showRepoPicker, setShowRepoPicker] = useState(false)
   const [repos, setRepos] = useState<GithubRepo[]>([])
@@ -27,6 +30,7 @@ export default function Applications() {
     domain: string
     envPairs: { key: string; value: string }[]
     ports: string[]
+    volumes: string[]
     databases: string[]
     caches: string[]
     kafkas: string[]
@@ -35,6 +39,7 @@ export default function Applications() {
     name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '',
     envPairs: [{ key: '', value: '' }],
     ports: [''],
+    volumes: [],
     databases: [],
     caches: [],
     kafkas: [],
@@ -45,7 +50,7 @@ export default function Applications() {
   const [envPasteText, setEnvPasteText] = useState('')
 
   const resetForm = () => {
-    setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], databases: [], caches: [], kafkas: [], monitorings: [] })
+    setForm({ name: '', docker_image: '', dockerfile_path: '', command: '', github_repo: '', domain: '', envPairs: [{ key: '', value: '' }], ports: [''], volumes: [], databases: [], caches: [], kafkas: [], monitorings: [] })
     setShowEnvPaste(false)
     setEnvPasteText('')
   }
@@ -76,6 +81,7 @@ export default function Applications() {
     caches.list().then(setCacheList).catch(() => {})
     kafkas.list().then(setKafkaList).catch(() => {})
     monitorings.list().then(setMonitoringList).catch(() => {})
+    nodesApi.list().then(setNodeList).catch(() => {})
   }, [])
 
   const handleCreate = async () => {
@@ -92,6 +98,7 @@ export default function Applications() {
         command: form.command,
         env_vars: envVars,
         ports: form.ports.filter(Boolean),
+        volumes: form.volumes.filter(Boolean).length > 0 ? form.volumes.filter(Boolean) : undefined,
         github_repo: form.github_repo || undefined,
         domain: form.domain || undefined,
         databases: form.databases.length > 0 ? form.databases : undefined,
@@ -127,6 +134,10 @@ export default function Applications() {
       const parsed = JSON.parse(a.ports) as string[]
       if (parsed.length > 0) ports = parsed
     } catch { /* keep default */ }
+    let vols: string[] = []
+    try {
+      vols = JSON.parse(a.volumes) as string[]
+    } catch { /* keep default */ }
     let dbs: string[] = []
     try {
       dbs = JSON.parse(a.databases) as string[]
@@ -152,6 +163,7 @@ export default function Applications() {
       domain: a.domain || '',
       envPairs,
       ports,
+      volumes: vols,
       databases: dbs,
       caches: cs,
       kafkas: ks,
@@ -207,6 +219,7 @@ export default function Applications() {
       domain: '',
       envPairs: [{ key: '', value: '' }],
       ports: [''],
+      volumes: [],
       databases: [],
       caches: [],
       kafkas: [],
@@ -224,6 +237,12 @@ export default function Applications() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
         <div className="flex gap-2">
+          <button
+            onClick={() => setShowComposeWizard(true)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+          >
+            Import docker-compose.yml
+          </button>
           <button
             onClick={handleFromGithub}
             className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm font-medium flex items-center gap-2"
@@ -428,6 +447,33 @@ export default function Applications() {
                 onClick={() => setForm(prev => ({ ...prev, ports: [...prev.ports, ''] }))}
                 className="text-xs text-purple-600 hover:underline"
               >+ Add port</button>
+            </div>
+
+            {/* Volumes */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Volumes</label>
+              {form.volumes.map((v, i) => (
+                <div key={i} className="flex gap-2 mb-1">
+                  <input
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    value={v}
+                    placeholder="vol-name:/container/path"
+                    onChange={e => {
+                      const volumes = [...form.volumes]
+                      volumes[i] = e.target.value
+                      setForm(prev => ({ ...prev, volumes }))
+                    }}
+                  />
+                  <button
+                    onClick={() => setForm(prev => ({ ...prev, volumes: prev.volumes.filter((_, j) => j !== i) }))}
+                    className="text-red-400 hover:text-red-600 px-2"
+                  >×</button>
+                </div>
+              ))}
+              <button
+                onClick={() => setForm(prev => ({ ...prev, volumes: [...prev.volumes, ''] }))}
+                className="text-xs text-purple-600 hover:underline"
+              >+ Add volume</button>
             </div>
 
             {/* Env Vars */}
@@ -692,6 +738,20 @@ export default function Applications() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {showComposeWizard && (
+        <ComposeImportWizard
+          nodes={nodeList}
+          onClose={() => setShowComposeWizard(false)}
+          onDone={() => {
+            setShowComposeWizard(false)
+            load()
+            databases.list().then(setDbList).catch(() => {})
+            caches.list().then(setCacheList).catch(() => {})
+            kafkas.list().then(setKafkaList).catch(() => {})
+          }}
+        />
       )}
     </div>
   )

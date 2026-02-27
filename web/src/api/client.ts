@@ -75,6 +75,7 @@ export interface Application {
   dockerfile_path: string
   env_vars: string  // JSON string
   ports: string     // JSON string
+  volumes: string   // JSON string
   command: string
   github_repo: string
   domain: string
@@ -92,6 +93,7 @@ export interface CreateApplicationInput {
   dockerfile_path?: string
   env_vars: Record<string, string>
   ports: string[]
+  volumes?: string[]
   command: string
   github_repo?: string
   domain?: string
@@ -148,6 +150,7 @@ export interface Cache {
   node_name: string
   node_host: string
   port: number
+  volumes: string  // JSON string
   container_name: string
   status: string
   created_at: string
@@ -160,6 +163,7 @@ export interface CreateCacheInput {
   node_id: string
   password: string
   port?: number
+  volumes?: string[]
 }
 
 export const caches = {
@@ -362,6 +366,64 @@ export const providers = {
   awsMetadata: () => request<AWSMetadata>('/providers/aws/metadata'),
   awsProvision: (data: AWSProvisionInput) =>
     request<Node>('/providers/aws/provision', { method: 'POST', body: JSON.stringify(data) }),
+}
+
+// Docker Compose Import
+export interface ComposeParsedApplication {
+  name: string
+  docker_image: string
+  build_path?: string
+  ports: string[]
+  volumes: string[]
+  env_vars: Record<string, string>
+  command?: string
+  depends_on?: string[]
+}
+
+export interface ComposeParsedDatabase {
+  name: string
+  type: string
+  version: string
+  port: number
+  dbname?: string
+  db_user?: string
+  env_vars: Record<string, string>
+  volumes: string[]
+}
+
+export interface ComposeParsedCache {
+  name: string
+  version: string
+  port: number
+  volumes: string[]
+}
+
+export interface ComposeParsedKafka {
+  name: string
+  version: string
+  port: number
+}
+
+export interface ComposeParsedObjectStorage {
+  name: string
+  version: string
+  port: number
+}
+
+export interface ComposePreview {
+  applications: ComposeParsedApplication[]
+  databases: ComposeParsedDatabase[]
+  caches: ComposeParsedCache[]
+  kafkas: ComposeParsedKafka[]
+  object_storages: ComposeParsedObjectStorage[]
+}
+
+export const composeImport = {
+  preview: (content: string) =>
+    request<ComposePreview>('/import/docker-compose', {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    }),
 }
 
 // Dashboard

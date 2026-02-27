@@ -32,6 +32,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		DockerfilePath string            `json:"dockerfile_path"`
 		EnvVars        map[string]string `json:"env_vars"`
 		Ports          []string          `json:"ports"`
+		Volumes        []string          `json:"volumes"`
 		Command        string            `json:"command"`
 		GithubRepo     string            `json:"github_repo"`
 		Domain         string            `json:"domain"`
@@ -61,6 +62,10 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if body.Ports == nil {
 		portsJSON = []byte("[]")
 	}
+	volumesJSON, _ := json.Marshal(body.Volumes)
+	if body.Volumes == nil {
+		volumesJSON = []byte("[]")
+	}
 	dbsJSON, _ := json.Marshal(body.Databases)
 	if body.Databases == nil {
 		dbsJSON = []byte("[]")
@@ -85,6 +90,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		DockerfilePath: body.DockerfilePath,
 		EnvVars:        string(envJSON),
 		Ports:          string(portsJSON),
+		Volumes:        string(volumesJSON),
 		Command:        body.Command,
 		GithubRepo:     body.GithubRepo,
 		Domain:         body.Domain,
@@ -150,6 +156,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 		DockerfilePath string            `json:"dockerfile_path"`
 		EnvVars        map[string]string `json:"env_vars"`
 		Ports          []string          `json:"ports"`
+		Volumes        []string          `json:"volumes"`
 		Command        string            `json:"command"`
 		Domain         string            `json:"domain"`
 		Databases      []string          `json:"databases"`
@@ -177,6 +184,10 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	if body.Ports == nil {
 		portsJSON = []byte("[]")
 	}
+	volumesJSON, _ := json.Marshal(body.Volumes)
+	if body.Volumes == nil {
+		volumesJSON = []byte("[]")
+	}
 	dbsJSON, _ := json.Marshal(body.Databases)
 	if body.Databases == nil {
 		dbsJSON = []byte("[]")
@@ -198,6 +209,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	existing.DockerfilePath = body.DockerfilePath
 	existing.EnvVars = string(envJSON)
 	existing.Ports = string(portsJSON)
+	existing.Volumes = string(volumesJSON)
 	existing.Command = body.Command
 	existing.Domain = body.Domain
 	existing.Databases = string(dbsJSON)

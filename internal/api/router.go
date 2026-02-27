@@ -24,6 +24,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 	webhookH := handlers.NewWebhookHandler(s)
 	authH := handlers.NewAuthHandler(s, oauthSvc, jwtSvc, appURL, rootEmail)
 	providersH := handlers.NewProvidersHandler(s)
+	composeH := handlers.NewComposeHandler(s)
 
 	// Unprotected mux (auth + webhooks)
 	publicMux := http.NewServeMux()
@@ -353,6 +354,15 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 		}
 	})
 
+	// Docker Compose Import
+	protectedMux.HandleFunc("/api/import/docker-compose", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			composeH.Preview(w, r)
+		} else {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Deployments
 	protectedMux.HandleFunc("/api/deployments", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -418,7 +428,7 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 
 // bodyLimitMiddleware caps request bodies at 1 MiB to prevent DoS via large payloads.
 func bodyLimitMiddleware(next http.Handler) http.Handler {
-	const maxBytes = 1 << 20 // 1 MiB
+	const maxBytes = 4 << 20 // 4 MiB
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 		next.ServeHTTP(w, r)

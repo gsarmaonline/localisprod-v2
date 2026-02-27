@@ -27,11 +27,12 @@ func (h *CacheHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name     string `json:"name"`
-		Version  string `json:"version"`
-		NodeID   string `json:"node_id"`
-		Password string `json:"password"`
-		Port     int    `json:"port"`
+		Name     string   `json:"name"`
+		Version  string   `json:"version"`
+		NodeID   string   `json:"node_id"`
+		Password string   `json:"password"`
+		Port     int      `json:"port"`
+		Volumes  []string `json:"volumes"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -78,7 +79,18 @@ func (h *CacheHandler) Create(w http.ResponseWriter, r *http.Request) {
 	safeName := strings.ReplaceAll(body.Name, " ", "-")
 	shortID := uuid.New().String()[:8]
 	containerName := fmt.Sprintf("localisprod-db-%s-%s", safeName, shortID)
-	volumeName := fmt.Sprintf("localisprod-%s-data", safeName)
+
+	// Resolve volumes: user-supplied or default named volume
+	var volumes []string
+	if len(body.Volumes) > 0 {
+		volumes = body.Volumes
+	} else {
+		volumeName := fmt.Sprintf("localisprod-%s-data", safeName)
+		_, _ = runner.Run(sshexec.DockerVolumeCreateCmd(volumeName))
+		volumes = []string{fmt.Sprintf("%s:/data", volumeName)}
+	}
+
+	volumesJSON, _ := json.Marshal(volumes)
 
 	c := &models.Cache{
 		ID:            uuid.New().String(),
@@ -87,6 +99,7 @@ func (h *CacheHandler) Create(w http.ResponseWriter, r *http.Request) {
 		NodeID:        body.NodeID,
 		Password:      body.Password,
 		Port:          port,
+		Volumes:       string(volumesJSON),
 		ContainerName: containerName,
 		Status:        "pending",
 		CreatedAt:     time.Now().UTC(),
@@ -96,14 +109,11 @@ func (h *CacheHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create named volume (idempotent)
-	_, _ = runner.Run(sshexec.DockerVolumeCreateCmd(volumeName))
-
 	runCfg := sshexec.RunConfig{
 		ContainerName: containerName,
 		Image:         fmt.Sprintf("redis:%s", version),
 		Ports:         []string{fmt.Sprintf("%d:6379", port)},
-		Volumes:       []string{fmt.Sprintf("%s:/data", volumeName)},
+		Volumes:       volumes,
 		Restart:       "unless-stopped",
 		Command:       fmt.Sprintf("redis-server --requirepass %s", sshexec.ShellEscape(body.Password)),
 	}
