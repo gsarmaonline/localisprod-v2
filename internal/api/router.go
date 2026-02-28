@@ -11,7 +11,7 @@ import (
 
 func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTService, appURL, rootEmail string) http.Handler {
 	nodeH := handlers.NewNodeHandler(s)
-	appH := handlers.NewApplicationHandler(s)
+	appH := handlers.NewServiceHandler(s)
 	depH := handlers.NewDeploymentHandler(s)
 	dbH := handlers.NewDatabaseHandler(s)
 	cacheH := handlers.NewCacheHandler(s)
@@ -177,8 +177,8 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 		}
 	})
 
-	// Applications
-	protectedMux.HandleFunc("/api/applications", func(w http.ResponseWriter, r *http.Request) {
+	// Services
+	protectedMux.HandleFunc("/api/services", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			appH.List(w, r)
@@ -189,8 +189,8 @@ func NewRouter(s *store.Store, oauthSvc *auth.OAuthService, jwtSvc *auth.JWTServ
 		}
 	})
 
-	protectedMux.HandleFunc("/api/applications/", func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/api/applications/")
+	protectedMux.HandleFunc("/api/services/", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/services/")
 		id := strings.TrimSuffix(path, "/")
 		if id == "" {
 			http.NotFound(w, r)

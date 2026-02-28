@@ -23,14 +23,14 @@ func TestDomainRouting_Labels(t *testing.T) {
 	hostPort := freePort()
 
 	// ── Create application with a domain ──────────────────────────────────────
-	appResp, err := apiPost("/api/applications", map[string]interface{}{
+	appResp, err := apiPost("/api/services", map[string]interface{}{
 		"name":         "integ-domain",
 		"docker_image": "nginx:alpine",
 		"ports":        []string{fmt.Sprintf("%d:80", hostPort)},
 		"domain":       "app.test.localhost",
 	})
 	if err != nil {
-		t.Fatalf("POST /api/applications: %v", err)
+		t.Fatalf("POST /api/services: %v", err)
 	}
 	defer appResp.Body.Close()
 	if appResp.StatusCode != http.StatusCreated {
@@ -42,12 +42,12 @@ func TestDomainRouting_Labels(t *testing.T) {
 		ID string `json:"id"`
 	}
 	decodeJSON(t, appResp.Body, &app)
-	t.Cleanup(func() { apiDelete("/api/applications/" + app.ID) })
+	t.Cleanup(func() { apiDelete("/api/services/" + app.ID) })
 
 	// ── Deploy ────────────────────────────────────────────────────────────────
 	depResp, err := apiPost("/api/deployments", map[string]interface{}{
-		"application_id": app.ID,
-		"node_id":        testNodeID,
+		"service_id": app.ID,
+		"node_id":    testNodeID,
 	})
 	if err != nil {
 		t.Fatalf("POST /api/deployments: %v", err)

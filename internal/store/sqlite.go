@@ -50,26 +50,29 @@ func (s *Store) migrate() error {
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN provider TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN provider_region TEXT NOT NULL DEFAULT ''`)
 	_, _ = s.db.Exec(`ALTER TABLE nodes ADD COLUMN provider_instance_id TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN domain TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN databases TEXT NOT NULL DEFAULT '[]'`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN dockerfile_path TEXT NOT NULL DEFAULT ''`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN caches TEXT NOT NULL DEFAULT '[]'`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN kafkas TEXT NOT NULL DEFAULT '[]'`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN monitorings TEXT NOT NULL DEFAULT '[]'`)
+	// Rename applications table to services (idempotent — fails silently if already renamed)
+	_, _ = s.db.Exec(`ALTER TABLE applications RENAME TO services`)
+	_, _ = s.db.Exec(`ALTER TABLE deployments RENAME COLUMN application_id TO service_id`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN github_repo TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN domain TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN databases TEXT NOT NULL DEFAULT '[]'`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN dockerfile_path TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN caches TEXT NOT NULL DEFAULT '[]'`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN kafkas TEXT NOT NULL DEFAULT '[]'`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN monitorings TEXT NOT NULL DEFAULT '[]'`)
 	// Multi-tenancy: add user_id to resource tables (idempotent, errors ignored)
-	_, _ = s.db.Exec(`ALTER TABLE nodes        ADD COLUMN user_id TEXT REFERENCES users(id)`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN user_id TEXT REFERENCES users(id)`)
-	_, _ = s.db.Exec(`ALTER TABLE deployments  ADD COLUMN user_id TEXT REFERENCES users(id)`)
+	_, _ = s.db.Exec(`ALTER TABLE nodes       ADD COLUMN user_id TEXT REFERENCES users(id)`)
+	_, _ = s.db.Exec(`ALTER TABLE services    ADD COLUMN user_id TEXT REFERENCES users(id)`)
+	_, _ = s.db.Exec(`ALTER TABLE deployments ADD COLUMN user_id TEXT REFERENCES users(id)`)
 	// last_deployed_at timestamps
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN last_deployed_at DATETIME`)
-	_, _ = s.db.Exec(`ALTER TABLE deployments  ADD COLUMN last_deployed_at DATETIME`)
-	_, _ = s.db.Exec(`ALTER TABLE databases    ADD COLUMN last_deployed_at DATETIME`)
-	_, _ = s.db.Exec(`ALTER TABLE caches       ADD COLUMN last_deployed_at DATETIME`)
-	_, _ = s.db.Exec(`ALTER TABLE kafkas       ADD COLUMN last_deployed_at DATETIME`)
-	_, _ = s.db.Exec(`ALTER TABLE monitorings  ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE services      ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE deployments   ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE databases     ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE caches        ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE kafkas        ADD COLUMN last_deployed_at DATETIME`)
+	_, _ = s.db.Exec(`ALTER TABLE monitorings   ADD COLUMN last_deployed_at DATETIME`)
 	_, _ = s.db.Exec(`ALTER TABLE object_storages ADD COLUMN last_deployed_at DATETIME`)
-	_, _ = s.db.Exec(`ALTER TABLE applications ADD COLUMN volumes TEXT NOT NULL DEFAULT '[]'`)
+	_, _ = s.db.Exec(`ALTER TABLE services ADD COLUMN volumes TEXT NOT NULL DEFAULT '[]'`)
 	_, _ = s.db.Exec(`ALTER TABLE caches ADD COLUMN volumes TEXT NOT NULL DEFAULT '[]'`)
 
 	_, err := s.db.Exec(`
@@ -106,7 +109,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS applications (
+CREATE TABLE IF NOT EXISTS services (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   docker_image TEXT NOT NULL,
@@ -202,11 +205,11 @@ CREATE TABLE IF NOT EXISTS object_storages (
   last_deployed_at DATETIME
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_applications_user_name ON applications(user_id, name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_services_user_name ON services(user_id, name);
 
 CREATE TABLE IF NOT EXISTS deployments (
   id TEXT PRIMARY KEY,
-  application_id TEXT NOT NULL REFERENCES applications(id),
+  service_id TEXT NOT NULL REFERENCES services(id),
   node_id TEXT NOT NULL REFERENCES nodes(id),
   container_name TEXT NOT NULL,
   container_id TEXT NOT NULL DEFAULT '',
@@ -465,48 +468,48 @@ func (s *Store) DeleteNode(id, userID string) error {
 	return err
 }
 
-// Applications
+// Services
 
-func (s *Store) CreateApplication(a *models.Application, userID string) error {
+func (s *Store) CreateService(a *models.Service, userID string) error {
 	envVars, err := s.encryptEnvVars(a.EnvVars)
 	if err != nil {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`INSERT INTO applications (id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, user_id, created_at)
+		`INSERT INTO services (id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, user_id, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		a.ID, a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Volumes, a.Command, a.GithubRepo, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, userID, a.CreatedAt,
 	)
 	return err
 }
 
-func (s *Store) ListApplications(userID string) ([]*models.Application, error) {
+func (s *Store) ListServices(userID string) ([]*models.Service, error) {
 	rows, err := s.db.Query(
 		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
-		 FROM applications WHERE user_id = ? ORDER BY created_at DESC`, userID)
+		 FROM services WHERE user_id = ? ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var apps []*models.Application
+	var svcs []*models.Service
 	for rows.Next() {
-		a := &models.Application{}
+		a := &models.Service{}
 		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Volumes, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
 			return nil, fmt.Errorf("decrypt env_vars for %s: %w", a.ID, err)
 		}
-		apps = append(apps, a)
+		svcs = append(svcs, a)
 	}
-	return apps, rows.Err()
+	return svcs, rows.Err()
 }
 
-func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
-	a := &models.Application{}
+func (s *Store) GetService(id, userID string) (*models.Service, error) {
+	a := &models.Service{}
 	err := s.db.QueryRow(
 		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
-		 FROM applications WHERE id = ? AND user_id = ?`, id, userID,
+		 FROM services WHERE id = ? AND user_id = ?`, id, userID,
 	).Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Volumes, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -520,63 +523,63 @@ func (s *Store) GetApplication(id, userID string) (*models.Application, error) {
 	return a, nil
 }
 
-func (s *Store) UpdateApplication(a *models.Application, userID string) error {
+func (s *Store) UpdateService(a *models.Service, userID string) error {
 	envVars, err := s.encryptEnvVars(a.EnvVars)
 	if err != nil {
 		return fmt.Errorf("encrypt env_vars: %w", err)
 	}
 	_, err = s.db.Exec(
-		`UPDATE applications SET name=?, docker_image=?, dockerfile_path=?, env_vars=?, ports=?, volumes=?, command=?, domain=?, databases=?, caches=?, kafkas=?, monitorings=?
+		`UPDATE services SET name=?, docker_image=?, dockerfile_path=?, env_vars=?, ports=?, volumes=?, command=?, domain=?, databases=?, caches=?, kafkas=?, monitorings=?
 		 WHERE id=? AND user_id=?`,
 		a.Name, a.DockerImage, a.DockerfilePath, envVars, a.Ports, a.Volumes, a.Command, a.Domain, a.Databases, a.Caches, a.Kafkas, a.Monitorings, a.ID, userID,
 	)
 	return err
 }
 
-func (s *Store) DeleteApplication(id, userID string) error {
-	_, err := s.db.Exec(`DELETE FROM applications WHERE id = ? AND user_id = ?`, id, userID)
+func (s *Store) DeleteService(id, userID string) error {
+	_, err := s.db.Exec(`DELETE FROM services WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 
-func (s *Store) ListApplicationsByUserAndRepo(userID, githubRepo string) ([]*models.Application, error) {
+func (s *Store) ListServicesByUserAndRepo(userID, githubRepo string) ([]*models.Service, error) {
 	rows, err := s.db.Query(
 		`SELECT id, name, docker_image, dockerfile_path, env_vars, ports, volumes, command, github_repo, domain, databases, caches, kafkas, monitorings, created_at, last_deployed_at
-		 FROM applications WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
+		 FROM services WHERE user_id = ? AND github_repo = ? ORDER BY created_at DESC`, userID, githubRepo)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var apps []*models.Application
+	var svcs []*models.Service
 	for rows.Next() {
-		a := &models.Application{}
+		a := &models.Service{}
 		if err := rows.Scan(&a.ID, &a.Name, &a.DockerImage, &a.DockerfilePath, &a.EnvVars, &a.Ports, &a.Volumes, &a.Command, &a.GithubRepo, &a.Domain, &a.Databases, &a.Caches, &a.Kafkas, &a.Monitorings, &a.CreatedAt, &a.LastDeployedAt); err != nil {
 			return nil, err
 		}
 		if a.EnvVars, err = s.decryptEnvVars(a.EnvVars); err != nil {
 			return nil, fmt.Errorf("decrypt env_vars for %s: %w", a.ID, err)
 		}
-		apps = append(apps, a)
+		svcs = append(svcs, a)
 	}
-	return apps, rows.Err()
+	return svcs, rows.Err()
 }
 
 // Deployments
 
 func (s *Store) CreateDeployment(d *models.Deployment, userID string) error {
 	_, err := s.db.Exec(
-		`INSERT INTO deployments (id, application_id, node_id, container_name, container_id, status, user_id, created_at)
+		`INSERT INTO deployments (id, service_id, node_id, container_name, container_id, status, user_id, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		d.ID, d.ApplicationID, d.NodeID, d.ContainerName, d.ContainerID, d.Status, userID, d.CreatedAt,
+		d.ID, d.ServiceID, d.NodeID, d.ContainerName, d.ContainerID, d.Status, userID, d.CreatedAt,
 	)
 	return err
 }
 
 func (s *Store) ListDeployments(userID string) ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
+		SELECT d.id, d.service_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
-		JOIN applications a ON d.application_id = a.id
+		JOIN services a ON d.service_id = a.id
 		JOIN nodes n ON d.node_id = n.id
 		WHERE d.user_id = ?
 		ORDER BY d.created_at DESC
@@ -588,7 +591,7 @@ func (s *Store) ListDeployments(userID string) ([]*models.Deployment, error) {
 	var deployments []*models.Deployment
 	for rows.Next() {
 		d := &models.Deployment{}
-		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
+		if err := rows.Scan(&d.ID, &d.ServiceID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
 			return nil, err
 		}
 		deployments = append(deployments, d)
@@ -599,29 +602,29 @@ func (s *Store) ListDeployments(userID string) ([]*models.Deployment, error) {
 func (s *Store) GetDeployment(id, userID string) (*models.Deployment, error) {
 	d := &models.Deployment{}
 	err := s.db.QueryRow(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
+		SELECT d.id, d.service_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
-		JOIN applications a ON d.application_id = a.id
+		JOIN services a ON d.service_id = a.id
 		JOIN nodes n ON d.node_id = n.id
 		WHERE d.id = ? AND d.user_id = ?
-	`, id, userID).Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage)
+	`, id, userID).Scan(&d.ID, &d.ServiceID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	return d, err
 }
 
-func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.Deployment, error) {
+func (s *Store) GetDeploymentsByServiceID(serviceID, userID string) ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
+		SELECT d.id, d.service_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image
 		FROM deployments d
-		JOIN applications a ON d.application_id = a.id
+		JOIN services a ON d.service_id = a.id
 		JOIN nodes n ON d.node_id = n.id
-		WHERE d.application_id = ? AND d.user_id = ?
+		WHERE d.service_id = ? AND d.user_id = ?
 		ORDER BY d.created_at DESC
-	`, appID, userID)
+	`, serviceID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +632,7 @@ func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.D
 	var deployments []*models.Deployment
 	for rows.Next() {
 		d := &models.Deployment{}
-		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
+		if err := rows.Scan(&d.ID, &d.ServiceID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage); err != nil {
 			return nil, err
 		}
 		deployments = append(deployments, d)
@@ -641,10 +644,10 @@ func (s *Store) GetDeploymentsByApplicationID(appID, userID string) ([]*models.D
 // Used by the background poller to check for new images.
 func (s *Store) ListAllRunningDeployments() ([]*models.Deployment, error) {
 	rows, err := s.db.Query(`
-		SELECT d.id, d.application_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
+		SELECT d.id, d.service_id, d.node_id, d.container_name, d.container_id, d.status, d.created_at, d.last_deployed_at,
 		       a.name, n.name, a.docker_image, d.user_id
 		FROM deployments d
-		JOIN applications a ON d.application_id = a.id
+		JOIN services a ON d.service_id = a.id
 		JOIN nodes n ON d.node_id = n.id
 		WHERE d.status = 'running' AND d.user_id IS NOT NULL
 	`)
@@ -655,7 +658,7 @@ func (s *Store) ListAllRunningDeployments() ([]*models.Deployment, error) {
 	var deployments []*models.Deployment
 	for rows.Next() {
 		d := &models.Deployment{}
-		if err := rows.Scan(&d.ID, &d.ApplicationID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage, &d.UserID); err != nil {
+		if err := rows.Scan(&d.ID, &d.ServiceID, &d.NodeID, &d.ContainerName, &d.ContainerID, &d.Status, &d.CreatedAt, &d.LastDeployedAt, &d.AppName, &d.NodeName, &d.DockerImage, &d.UserID); err != nil {
 			return nil, err
 		}
 		deployments = append(deployments, d)
@@ -673,8 +676,8 @@ func (s *Store) UpdateDeploymentLastDeployedAt(id, userID string, t time.Time) e
 	return err
 }
 
-func (s *Store) UpdateApplicationLastDeployedAt(appID, userID string, t time.Time) error {
-	_, err := s.db.Exec(`UPDATE applications SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, appID, userID)
+func (s *Store) UpdateServiceLastDeployedAt(serviceID, userID string, t time.Time) error {
+	_, err := s.db.Exec(`UPDATE services SET last_deployed_at = ? WHERE id = ? AND user_id = ?`, t, serviceID, userID)
 	return err
 }
 
@@ -707,9 +710,9 @@ func (s *Store) CountNodes(userID string) (int, error) {
 	return count, err
 }
 
-func (s *Store) CountApplications(userID string) (int, error) {
+func (s *Store) CountServices(userID string) (int, error) {
 	var count int
-	err := s.db.QueryRow(`SELECT COUNT(*) FROM applications WHERE user_id = ?`, userID).Scan(&count)
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM services WHERE user_id = ?`, userID).Scan(&count)
 	return count, err
 }
 

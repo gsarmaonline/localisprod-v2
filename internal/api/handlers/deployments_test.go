@@ -17,8 +17,8 @@ func TestDeploymentCreate_MissingFields(t *testing.T) {
 		body map[string]any
 	}{
 		{"no fields", map[string]any{}},
-		{"missing node_id", map[string]any{"application_id": "some-id"}},
-		{"missing application_id", map[string]any{"node_id": "some-id"}},
+		{"missing node_id", map[string]any{"service_id": "some-id"}},
+		{"missing service_id", map[string]any{"node_id": "some-id"}},
 	}
 
 	for _, tt := range tests {
@@ -53,7 +53,7 @@ func TestDeploymentCreate_AppNotFound(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	r := postJSON(t, "/api/deployments", map[string]any{
-		"application_id": "nonexistent-app",
+		"service_id": "nonexistent-app",
 		"node_id":        "some-node",
 	})
 	h.Create(rec, r)
@@ -70,7 +70,7 @@ func TestDeploymentCreate_NodeNotFound(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	r := postJSON(t, "/api/deployments", map[string]any{
-		"application_id": a.ID,
+		"service_id": a.ID,
 		"node_id":        "nonexistent-node",
 	})
 	h.Create(rec, r)
@@ -89,7 +89,7 @@ func TestDeploymentCreate_LocalNode_NonRoot_Forbidden(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	r := postJSON(t, "/api/deployments", map[string]any{
-		"application_id": a.ID,
+		"service_id": a.ID,
 		"node_id":        n.ID,
 	})
 	h.Create(rec, r)
@@ -109,7 +109,7 @@ func TestDeploymentCreate_LocalNode_RootUser_DockerNotAvailable(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	r := postJSONAsRoot(t, "/api/deployments", map[string]any{
-		"application_id": a.ID,
+		"service_id": a.ID,
 		"node_id":        n.ID,
 	})
 	h.Create(rec, r)

@@ -13,14 +13,14 @@ import (
 func TestNginxDeployment(t *testing.T) {
 	hostPort := freePort()
 
-	// ── Create application ────────────────────────────────────────────────────
-	appResp, err := apiPost("/api/applications", map[string]interface{}{
+	// ── Create service ────────────────────────────────────────────────────────
+	appResp, err := apiPost("/api/services", map[string]interface{}{
 		"name":         "integ-nginx",
 		"docker_image": "nginx:alpine",
 		"ports":        []string{fmt.Sprintf("%d:80", hostPort)},
 	})
 	if err != nil {
-		t.Fatalf("POST /api/applications: %v", err)
+		t.Fatalf("POST /api/services: %v", err)
 	}
 	defer appResp.Body.Close()
 	if appResp.StatusCode != http.StatusCreated {
@@ -34,13 +34,13 @@ func TestNginxDeployment(t *testing.T) {
 	decodeJSON(t, appResp.Body, &app)
 
 	t.Cleanup(func() {
-		apiDelete("/api/applications/" + app.ID)
+		apiDelete("/api/services/" + app.ID)
 	})
 
 	// ── Deploy ────────────────────────────────────────────────────────────────
 	depResp, err := apiPost("/api/deployments", map[string]interface{}{
-		"application_id": app.ID,
-		"node_id":        testNodeID,
+		"service_id": app.ID,
+		"node_id":    testNodeID,
 	})
 	if err != nil {
 		t.Fatalf("POST /api/deployments: %v", err)

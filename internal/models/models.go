@@ -28,7 +28,7 @@ type Node struct {
 	CreatedAt          time.Time `json:"created_at"`
 }
 
-type Application struct {
+type Service struct {
 	ID             string     `json:"id"`
 	Name           string     `json:"name"`
 	DockerImage    string     `json:"docker_image"`
@@ -155,9 +155,9 @@ type NodeVolumeMigration struct {
 // completed, rolling_back, rolled_back, failed
 
 type Deployment struct {
-	ID             string     `json:"id"`
-	ApplicationID  string     `json:"application_id"`
-	NodeID         string     `json:"node_id"`
+	ID        string     `json:"id"`
+	ServiceID string     `json:"service_id"`
+	NodeID    string     `json:"node_id"`
 	ContainerName  string     `json:"container_name"`
 	ContainerID    string     `json:"container_id"`
 	Status         string     `json:"status"`

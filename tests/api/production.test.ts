@@ -55,7 +55,7 @@ afterAll(async () => {
   const targets = [
     created.deploymentID && `/api/deployments/${created.deploymentID}`,
     created.dbID         && `/api/databases/${created.dbID}`,
-    created.appID        && `/api/applications/${created.appID}`,
+    created.appID        && `/api/services/${created.appID}`,
     created.nodeID       && `/api/nodes/${created.nodeID}`,
   ].filter(Boolean) as string[];
 
@@ -90,11 +90,11 @@ describe('dashboard', () => {
   it('GET /api/stats → returns counts', async () => {
     const stats = await api.get<{
       nodes: number;
-      applications: number;
+      services: number;
       deployments: Record<string, number> | number;
     }>('/api/stats');
     expect(typeof stats.nodes).toBe('number');
-    expect(typeof stats.applications).toBe('number');
+    expect(typeof stats.services).toBe('number');
     // deployments may be a flat number or a { running: N, failed: N, ... } object
     expect(stats.deployments).toBeDefined();
     const depTotal =
@@ -102,7 +102,7 @@ describe('dashboard', () => {
         ? stats.deployments
         : Object.values(stats.deployments as Record<string, number>).reduce((s, v) => s + v, 0);
     console.log(
-      `  → nodes=${stats.nodes}  apps=${stats.applications}  deployments(total)=${depTotal}`
+      `  → nodes=${stats.nodes}  services=${stats.services}  deployments(total)=${depTotal}`
     );
   });
 });
@@ -158,11 +158,11 @@ describe('nodes', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 5. Applications
+// 5. Services
 // ═══════════════════════════════════════════════════════════════════════════
-describe('applications', () => {
-  it('POST /api/applications → creates an app', async () => {
-    const app = await api.post<AppResp>('/api/applications', {
+describe('services', () => {
+  it('POST /api/services → creates an app', async () => {
+    const app = await api.post<AppResp>('/api/services', {
       name:         `${RUN}-app`,
       docker_image: 'nginx:alpine',
       ports:        ['18080:80'],
@@ -173,18 +173,18 @@ describe('applications', () => {
     console.log(`  → id=${app.id}  name=${app.name}`);
   });
 
-  it('GET /api/applications → lists apps, includes created one', async () => {
-    const apps = await api.get<WithID[]>('/api/applications');
+  it('GET /api/services → lists apps, includes created one', async () => {
+    const apps = await api.get<WithID[]>('/api/services');
     expect(apps.some(a => a.id === created.appID)).toBe(true);
   });
 
-  it('GET /api/applications/:id → returns app by id', async () => {
-    const app = await api.get<AppResp>(`/api/applications/${created.appID}`);
+  it('GET /api/services/:id → returns app by id', async () => {
+    const app = await api.get<AppResp>(`/api/services/${created.appID}`);
     expect(app.id).toBe(created.appID);
   });
 
-  it('PUT /api/applications/:id → updates app env vars', async () => {
-    const updated = await api.put<AppResp>(`/api/applications/${created.appID}`, {
+  it('PUT /api/services/:id → updates app env vars', async () => {
+    const updated = await api.put<AppResp>(`/api/services/${created.appID}`, {
       name:         `${RUN}-app`,
       docker_image: 'nginx:alpine',
       ports:        ['18080:80'],
@@ -241,8 +241,8 @@ describe('databases', () => {
 describe('deployments', () => {
   it('POST /api/deployments → pulls and runs the app container', async () => {
     const dep = await api.post<DepResp>('/api/deployments', {
-      application_id: created.appID,
-      node_id:        created.nodeID,
+      service_id: created.appID,
+      node_id:    created.nodeID,
     });
     expect(dep.id).toBeTruthy();
     expect(dep.status).toBe('running');

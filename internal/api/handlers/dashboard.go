@@ -20,12 +20,12 @@ func (h *DashboardHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	nodeCount, _ := h.store.CountNodes(userID)
-	appCount, _ := h.store.CountApplications(userID)
+	serviceCount, _ := h.store.CountServices(userID)
 	deploymentCounts, _ := h.store.CountDeploymentsByStatus(userID)
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"nodes":        nodeCount,
-		"applications": appCount,
-		"deployments":  deploymentCounts,
+		"nodes":       nodeCount,
+		"services":    serviceCount,
+		"deployments": deploymentCounts,
 	})
 }

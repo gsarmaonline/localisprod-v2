@@ -77,7 +77,7 @@ func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, t
 		return
 	}
 
-	apps, err := h.store.ListApplicationsByUserAndRepo(user.ID, repoFullName)
+	apps, err := h.store.ListServicesByUserAndRepo(user.ID, repoFullName)
 	if err != nil {
 		writeInternalError(w, err)
 		return
@@ -89,7 +89,7 @@ func (h *WebhookHandler) GithubForUser(w http.ResponseWriter, r *http.Request, t
 	redeployed := 0
 
 	for _, app := range apps {
-		deployments, err := h.store.GetDeploymentsByApplicationID(app.ID, user.ID)
+		deployments, err := h.store.GetDeploymentsByServiceID(app.ID, user.ID)
 		if err != nil {
 			log.Printf("webhook: list deployments for app %s: %v", app.ID, err)
 			continue

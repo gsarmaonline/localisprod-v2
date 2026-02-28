@@ -8,9 +8,9 @@ import (
 	"github.com/gsarma/localisprod-v2/internal/api/handlers"
 )
 
-func TestApplicationCreate_MissingFields(t *testing.T) {
+func TestServiceCreate_MissingFields(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 
 	tests := []struct {
 		name string
@@ -24,7 +24,7 @@ func TestApplicationCreate_MissingFields(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			r := postJSON(t, "/api/applications", tt.body)
+			r := postJSON(t, "/api/services", tt.body)
 			h.Create(rec, r)
 			if rec.Code != http.StatusBadRequest {
 				t.Errorf("expected 400, got %d (body: %s)", rec.Code, rec.Body)
@@ -33,12 +33,12 @@ func TestApplicationCreate_MissingFields(t *testing.T) {
 	}
 }
 
-func TestApplicationCreate_InvalidJSON(t *testing.T) {
+func TestServiceCreate_InvalidJSON(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := withUserID(httptest.NewRequest(http.MethodPost, "/api/applications", nil))
+	r := withUserID(httptest.NewRequest(http.MethodPost, "/api/services", nil))
 	r.Header.Set("Content-Type", "application/json")
 	h.Create(rec, r)
 
@@ -47,12 +47,12 @@ func TestApplicationCreate_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestApplicationCreate_Success_Minimal(t *testing.T) {
+func TestServiceCreate_Success_Minimal(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := postJSON(t, "/api/applications", map[string]any{
+	r := postJSON(t, "/api/services", map[string]any{
 		"name":         "my-app",
 		"docker_image": "nginx:latest",
 	})
@@ -82,12 +82,12 @@ func TestApplicationCreate_Success_Minimal(t *testing.T) {
 	}
 }
 
-func TestApplicationCreate_Success_WithEnvAndPorts(t *testing.T) {
+func TestServiceCreate_Success_WithEnvAndPorts(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := postJSON(t, "/api/applications", map[string]any{
+	r := postJSON(t, "/api/services", map[string]any{
 		"name":         "full-app",
 		"docker_image": "myimage:v1",
 		"env_vars":     map[string]string{"FOO": "bar", "SECRET": "value"},
@@ -112,12 +112,12 @@ func TestApplicationCreate_Success_WithEnvAndPorts(t *testing.T) {
 	}
 }
 
-func TestApplicationList_Empty(t *testing.T) {
+func TestServiceList_Empty(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 
 	rec := httptest.NewRecorder()
-	h.List(rec, getRequest("/api/applications"))
+	h.List(rec, getRequest("/api/services"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -129,13 +129,13 @@ func TestApplicationList_Empty(t *testing.T) {
 	}
 }
 
-func TestApplicationList_WithItems(t *testing.T) {
+func TestServiceList_WithItems(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 	mustCreateApp(t, s)
 
 	rec := httptest.NewRecorder()
-	h.List(rec, getRequest("/api/applications"))
+	h.List(rec, getRequest("/api/services"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -143,16 +143,16 @@ func TestApplicationList_WithItems(t *testing.T) {
 	var resp []map[string]any
 	decodeJSON(t, rec, &resp)
 	if len(resp) != 1 {
-		t.Fatalf("expected 1 app, got %d", len(resp))
+		t.Fatalf("expected 1 service, got %d", len(resp))
 	}
 }
 
-func TestApplicationGet_NotFound(t *testing.T) {
+func TestServiceGet_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 
 	rec := httptest.NewRecorder()
-	h.Get(rec, getRequest("/api/applications/nonexistent"), "nonexistent")
+	h.Get(rec, getRequest("/api/services/nonexistent"), "nonexistent")
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rec.Code)
@@ -164,13 +164,13 @@ func TestApplicationGet_NotFound(t *testing.T) {
 	}
 }
 
-func TestApplicationGet_Success(t *testing.T) {
+func TestServiceGet_Success(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 	a := mustCreateApp(t, s)
 
 	rec := httptest.NewRecorder()
-	h.Get(rec, getRequest("/api/applications/"+a.ID), a.ID)
+	h.Get(rec, getRequest("/api/services/"+a.ID), a.ID)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body: %s)", rec.Code, rec.Body)
@@ -185,12 +185,12 @@ func TestApplicationGet_Success(t *testing.T) {
 	}
 }
 
-func TestApplicationDelete_NotFound(t *testing.T) {
+func TestServiceDelete_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 
 	rec := httptest.NewRecorder()
-	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/applications/bad", nil))
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/services/bad", nil))
 	h.Delete(rec, r, "bad")
 
 	if rec.Code != http.StatusNotFound {
@@ -198,13 +198,13 @@ func TestApplicationDelete_NotFound(t *testing.T) {
 	}
 }
 
-func TestApplicationDelete_Success(t *testing.T) {
+func TestServiceDelete_Success(t *testing.T) {
 	s := newTestStore(t)
-	h := handlers.NewApplicationHandler(s)
+	h := handlers.NewServiceHandler(s)
 	a := mustCreateApp(t, s)
 
 	rec := httptest.NewRecorder()
-	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/applications/"+a.ID, nil))
+	r := withUserID(httptest.NewRequest(http.MethodDelete, "/api/services/"+a.ID, nil))
 	h.Delete(rec, r, a.ID)
 
 	if rec.Code != http.StatusNoContent {
@@ -213,7 +213,7 @@ func TestApplicationDelete_Success(t *testing.T) {
 
 	// Verify deletion.
 	rec2 := httptest.NewRecorder()
-	h.Get(rec2, getRequest("/api/applications/"+a.ID), a.ID)
+	h.Get(rec2, getRequest("/api/services/"+a.ID), a.ID)
 	if rec2.Code != http.StatusNotFound {
 		t.Errorf("expected 404 after deletion, got %d", rec2.Code)
 	}

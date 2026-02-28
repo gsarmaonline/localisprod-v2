@@ -22,7 +22,7 @@ export default function Dashboard() {
 
   const cards = [
     { label: 'Nodes', value: stats.nodes, color: 'bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-700' },
-    { label: 'Applications', value: stats.applications, color: 'bg-gradient-to-br from-violet-50 to-purple-100 text-purple-700' },
+    { label: 'Services', value: stats.services, color: 'bg-gradient-to-br from-violet-50 to-purple-100 text-purple-700' },
     { label: 'Running', value: running, color: 'bg-gradient-to-br from-emerald-50 to-green-100 text-green-700' },
     { label: 'Pending', value: pending, color: 'bg-gradient-to-br from-amber-50 to-yellow-100 text-yellow-700' },
     { label: 'Stopped', value: stopped, color: 'bg-gradient-to-br from-orange-50 to-orange-100 text-orange-700' },

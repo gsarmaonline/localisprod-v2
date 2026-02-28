@@ -26,7 +26,7 @@ type composeService struct {
 
 // ---- preview types returned to the client ----
 
-type ParsedApplication struct {
+type ParsedService struct {
 	Name        string            `json:"name"`
 	DockerImage string            `json:"docker_image"`
 	BuildPath   string            `json:"build_path,omitempty"`
@@ -68,11 +68,11 @@ type ParsedObjectStorage struct {
 }
 
 type Preview struct {
-	Applications  []ParsedApplication  `json:"applications"`
-	Databases     []ParsedDatabase     `json:"databases"`
-	Caches        []ParsedCache        `json:"caches"`
-	Kafkas        []ParsedKafka        `json:"kafkas"`
-	ObjectStorages []ParsedObjectStorage `json:"object_storages"`
+	Services       []ParsedService       `json:"services"`
+	Databases      []ParsedDatabase      `json:"databases"`
+	Caches         []ParsedCache         `json:"caches"`
+	Kafkas         []ParsedKafka         `json:"kafkas"`
+	ObjectStorages []ParsedObjectStorage  `json:"object_storages"`
 }
 
 // Parse parses the given docker-compose YAML content and returns a Preview.
@@ -152,8 +152,8 @@ func Parse(content []byte) (*Preview, error) {
 				Port:    firstHostPort(ports, 9000),
 			})
 
-		default: // application
-			app := ParsedApplication{
+		default: // service
+			app := ParsedService{
 				Name:      name,
 				DependsOn: deps,
 				Ports:     ports,
@@ -167,7 +167,7 @@ func Parse(content []byte) (*Preview, error) {
 			} else {
 				app.DockerImage = svc.Image
 			}
-			preview.Applications = append(preview.Applications, app)
+			preview.Services = append(preview.Services, app)
 		}
 	}
 
@@ -179,9 +179,9 @@ func classify(name, image string, build interface{}) string {
 	img := strings.ToLower(image)
 	svcName := strings.ToLower(name)
 
-	// Build-based services are always applications
+	// Build-based services are always services
 	if build != nil {
-		return "application"
+		return "service"
 	}
 
 	// Image-based classification
@@ -221,7 +221,7 @@ func classify(name, image string, build interface{}) string {
 		return "object_storage"
 	}
 
-	return "application"
+	return "service"
 }
 
 // splitImageTag splits "image:tag" into (image, tag). Tag defaults to "latest".

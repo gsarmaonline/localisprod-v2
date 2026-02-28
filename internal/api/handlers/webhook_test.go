@@ -254,7 +254,7 @@ func TestWebhookGithubForUser_WithMatchingApp_NonRunningDeployment(t *testing.T)
 	}
 	_ = s.CreateNode(n, userID)
 
-	app := &models.Application{
+	app := &models.Service{
 		ID:          "wh-app",
 		Name:        "wh-app",
 		DockerImage: "nginx:latest",
@@ -263,11 +263,11 @@ func TestWebhookGithubForUser_WithMatchingApp_NonRunningDeployment(t *testing.T)
 		GithubRepo:  "owner/my-repo",
 		CreatedAt:   time.Now().UTC(),
 	}
-	_ = s.CreateApplication(app, userID)
+	_ = s.CreateService(app, userID)
 
 	dep := &models.Deployment{
 		ID:            "wh-dep",
-		ApplicationID: app.ID,
+		ServiceID:     app.ID,
 		NodeID:        n.ID,
 		ContainerName: "localisprod-wh-app-abcd1234",
 		Status:        "pending", // not running — should be skipped
