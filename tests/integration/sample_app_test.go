@@ -90,7 +90,7 @@ func TestSampleApp(t *testing.T) {
 		redisPort, // redis GET
 	)
 
-	appResp, err := apiPost("/api/applications", map[string]interface{}{
+	appResp, err := apiPost("/api/services", map[string]interface{}{
 		"name":         "sample-app",
 		"docker_image": "alpine:3.21",
 		"command":      appCmd,
@@ -99,7 +99,7 @@ func TestSampleApp(t *testing.T) {
 		"kafkas":       []string{kfk.ID},
 	})
 	if err != nil {
-		t.Fatalf("POST /api/applications: %v", err)
+		t.Fatalf("POST /api/services: %v", err)
 	}
 	defer appResp.Body.Close()
 	if appResp.StatusCode != http.StatusCreated {
@@ -112,13 +112,13 @@ func TestSampleApp(t *testing.T) {
 	}
 	decodeJSON(t, appResp.Body, &app)
 	t.Cleanup(func() {
-		apiDelete("/api/applications/" + app.ID)
+		apiDelete("/api/services/" + app.ID)
 	})
 
 	// ── 7. Deploy ─────────────────────────────────────────────────────────────
 	depResp, err := apiPost("/api/deployments", map[string]interface{}{
-		"application_id": app.ID,
-		"node_id":        testNodeID,
+		"service_id": app.ID,
+		"node_id":    testNodeID,
 	})
 	if err != nil {
 		t.Fatalf("POST /api/deployments: %v", err)

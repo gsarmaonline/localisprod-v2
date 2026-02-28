@@ -3,7 +3,7 @@ import Modal from './Modal'
 import {
   composeImport,
   ComposePreview,
-  ComposeParsedApplication,
+  ComposeParsedService,
   ComposeParsedDatabase,
   ComposeParsedCache,
   ComposeParsedKafka,
@@ -11,8 +11,8 @@ import {
   databases,
   caches,
   kafkas,
-  applications,
-  CreateApplicationInput,
+  services,
+  CreateServiceInput,
 } from '../api/client'
 
 interface Props {
@@ -84,7 +84,7 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
         name: k.name,
         port: String(k.port),
       })))
-      setAppOverrides((p.applications ?? []).map(a => ({
+      setAppOverrides((p.services ?? []).map(a => ({
         name: a.name,
         docker_image: a.docker_image ?? '',
       })))
@@ -159,11 +159,11 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
         log(`  ✓ Kafka "${ov.name}" created`)
       }
 
-      // 4. Create applications — link all resources to apps that depend on them
-      for (let i = 0; i < (preview.applications ?? []).length; i++) {
-        const app = preview.applications[i]
+      // 4. Create services — link all resources to apps that depend on them
+      for (let i = 0; i < (preview.services ?? []).length; i++) {
+        const app = preview.services[i]
         const ov = appOverrides[i]
-        log(`Creating application "${ov.name}"…`)
+        log(`Creating service "${ov.name}"…`)
 
         // Determine linked resource IDs based on depends_on service names
         const deps = new Set(app.depends_on ?? [])
@@ -182,7 +182,7 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
 
         const envVars: Record<string, string> = { ...(app.env_vars ?? {}) }
 
-        const data: CreateApplicationInput = {
+        const data: CreateServiceInput = {
           name: ov.name,
           docker_image: ov.docker_image,
           dockerfile_path: app.build_path || undefined,
@@ -194,8 +194,8 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
           caches: linkedCaches.length > 0 ? linkedCaches : undefined,
           kafkas: linkedKafkas.length > 0 ? linkedKafkas : undefined,
         }
-        await applications.create(data)
-        log(`  ✓ Application "${ov.name}" created`)
+        await services.create(data)
+        log(`  ✓ Service "${ov.name}" created`)
       }
 
       log('All objects created successfully.')
@@ -206,7 +206,7 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
   }
 
   const totalItems =
-    (preview?.applications?.length ?? 0) +
+    (preview?.services?.length ?? 0) +
     (preview?.databases?.length ?? 0) +
     (preview?.caches?.length ?? 0) +
     (preview?.kafkas?.length ?? 0) +
@@ -218,7 +218,7 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
         <div className="space-y-4">
           <p className="text-sm text-gray-500">
             Paste your <code className="font-mono bg-gray-100 px-1 rounded">docker-compose.yml</code> below.
-            Services will be automatically classified into Applications, Databases, Caches, and Kafkas.
+            Services will be automatically classified into Services, Databases, Caches, and Kafkas.
           </p>
           <textarea
             className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y"
@@ -248,14 +248,14 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
             Review the details below, assign nodes and passwords, then click <strong>Create All</strong>.
           </p>
 
-          {/* Applications */}
-          {(preview.applications ?? []).length > 0 && (
+          {/* Services */}
+          {(preview.services ?? []).length > 0 && (
             <section>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                Applications ({preview.applications.length})
+                Services ({preview.services.length})
               </h3>
               <div className="space-y-2">
-                {preview.applications.map((app, i) => (
+                {preview.services.map((app, i) => (
                   <AppReviewCard
                     key={i}
                     app={app}
@@ -391,7 +391,7 @@ export default function ComposeImportWizard({ nodes, onClose, onDone }: Props) {
 // ---- sub-cards ----
 
 function AppReviewCard({ app, override, onChange }: {
-  app: ComposeParsedApplication
+  app: ComposeParsedService
   override: AppOverride
   onChange: (ov: AppOverride) => void
 }) {

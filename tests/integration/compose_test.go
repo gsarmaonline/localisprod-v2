@@ -83,14 +83,14 @@ volumes:
 	}
 
 	var preview struct {
-		Applications []struct {
+		Services []struct {
 			Name        string            `json:"name"`
 			DockerImage string            `json:"docker_image"`
 			Ports       []string          `json:"ports"`
 			Volumes     []string          `json:"volumes"`
 			EnvVars     map[string]string `json:"env_vars"`
 			DependsOn   []string          `json:"depends_on"`
-		} `json:"applications"`
+		} `json:"services"`
 		Databases []struct {
 			Name    string            `json:"name"`
 			Type    string            `json:"type"`
@@ -119,11 +119,11 @@ volumes:
 	}
 	decodeJSON(t, resp.Body, &preview)
 
-	// ── Applications ──────────────────────────────────────────────────────────
-	if len(preview.Applications) != 1 {
-		t.Fatalf("expected 1 application, got %d", len(preview.Applications))
+	// ── Services ──────────────────────────────────────────────────────────────
+	if len(preview.Services) != 1 {
+		t.Fatalf("expected 1 service, got %d", len(preview.Services))
 	}
-	app := preview.Applications[0]
+	app := preview.Services[0]
 	if app.Name != "web" {
 		t.Errorf("application name: want 'web', got %q", app.Name)
 	}
@@ -246,7 +246,7 @@ volumes:
 	}
 
 	t.Logf("preview: %d apps, %d databases, %d caches, %d kafkas, %d object_storages",
-		len(preview.Applications), len(preview.Databases),
+		len(preview.Services), len(preview.Databases),
 		len(preview.Caches), len(preview.Kafkas), len(preview.ObjectStorages))
 }
 
@@ -301,14 +301,14 @@ func TestVolumeMount(t *testing.T) {
 	// Create an alpine application with a named volume.  The command writes a
 	// sentinel file to the mount point and then sleeps so the container stays
 	// in "running" state for the duration of the assertions.
-	appResp, err := apiPost("/api/applications", map[string]interface{}{
+	appResp, err := apiPost("/api/services", map[string]interface{}{
 		"name":         "vol-test-app",
 		"docker_image": "alpine:3.21",
 		"volumes":      []string{volumeName + ":/data"},
 		"command":      `sh -c "echo hello-from-volume > /data/sentinel.txt && sleep 3600"`,
 	})
 	if err != nil {
-		t.Fatalf("POST /api/applications: %v", err)
+		t.Fatalf("POST /api/services: %v", err)
 	}
 	defer appResp.Body.Close()
 	if appResp.StatusCode != http.StatusCreated {
@@ -320,12 +320,12 @@ func TestVolumeMount(t *testing.T) {
 		ID string `json:"id"`
 	}
 	decodeJSON(t, appResp.Body, &app)
-	t.Cleanup(func() { apiDelete("/api/applications/" + app.ID) })
+	t.Cleanup(func() { apiDelete("/api/services/" + app.ID) })
 
 	// Deploy the application.
 	depResp, err := apiPost("/api/deployments", map[string]interface{}{
-		"application_id": app.ID,
-		"node_id":        testNodeID,
+		"service_id": app.ID,
+		"node_id":    testNodeID,
 	})
 	if err != nil {
 		t.Fatalf("POST /api/deployments: %v", err)

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faGithub } from '@fortawesome/free-brands-svg-icons'
-import { applications, databases, caches, kafkas, monitorings, nodes as nodesApi, github, settings, Application, Database, Cache, Kafka, Monitoring, Node, CreateApplicationInput, GithubRepo } from '../api/client'
+import { services, databases, caches, kafkas, monitorings, nodes as nodesApi, github, settings, Service, Database, Cache, Kafka, Monitoring, Node, CreateServiceInput, GithubRepo } from '../api/client'
 import Modal from '../components/Modal'
 import ComposeImportWizard from '../components/ComposeImportWizard'
 
-export default function Applications() {
-  const [appList, setAppList] = useState<Application[]>([])
+export default function Services() {
+  const [appList, setAppList] = useState<Service[]>([])
   const [dbList, setDbList] = useState<Database[]>([])
   const [cacheList, setCacheList] = useState<Cache[]>([])
   const [kafkaList, setKafkaList] = useState<Kafka[]>([])
@@ -73,7 +73,7 @@ export default function Applications() {
   }
 
   const load = () =>
-    applications.list().then(setAppList).catch(e => setError(e.message))
+    services.list().then(setAppList).catch(e => setError(e.message))
 
   useEffect(() => {
     load()
@@ -91,7 +91,7 @@ export default function Applications() {
       for (const { key, value } of form.envPairs) {
         if (key) envVars[key] = value
       }
-      const data: CreateApplicationInput = {
+      const data: CreateServiceInput = {
         name: form.name,
         docker_image: form.docker_image,
         dockerfile_path: form.dockerfile_path || undefined,
@@ -107,10 +107,10 @@ export default function Applications() {
         monitorings: form.monitorings.length > 0 ? form.monitorings : undefined,
       }
       if (editingId) {
-        await applications.update(editingId, data)
+        await services.update(editingId, data)
         setEditingId(null)
       } else {
-        await applications.create(data)
+        await services.create(data)
       }
       setShowCreate(false)
       resetForm()
@@ -122,7 +122,7 @@ export default function Applications() {
     }
   }
 
-  const handleEdit = (a: Application) => {
+  const handleEdit = (a: Service) => {
     let envPairs: { key: string; value: string }[] = [{ key: '', value: '' }]
     try {
       const parsed = JSON.parse(a.env_vars) as Record<string, string>
@@ -174,9 +174,9 @@ export default function Applications() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this application?')) return
+    if (!confirm('Delete this service?')) return
     try {
-      await applications.delete(id)
+      await services.delete(id)
       await load()
     } catch (e: unknown) {
       setError((e as Error).message)
@@ -235,7 +235,7 @@ export default function Applications() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Services</h1>
         <div className="flex gap-2">
           <button
             onClick={() => setShowComposeWizard(true)}
@@ -254,7 +254,7 @@ export default function Applications() {
             onClick={() => { resetForm(); setShowCreate(true) }}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
           >
-            + Create App
+            + Create Service
           </button>
         </div>
       </div>
@@ -282,7 +282,7 @@ export default function Applications() {
           <tbody className="divide-y">
             {appList.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No applications yet</td>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">No services yet</td>
               </tr>
             )}
             {appList.map(a => (
@@ -376,7 +376,7 @@ export default function Applications() {
       )}
 
       {showCreate && (
-        <Modal title={editingId ? 'Edit Application' : 'Create Application'} onClose={() => { setShowCreate(false); setEditingId(null); resetForm() }}>
+        <Modal title={editingId ? 'Edit Service' : 'Create Service'} onClose={() => { setShowCreate(false); setEditingId(null); resetForm() }}>
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -733,7 +733,7 @@ export default function Applications() {
                 disabled={loading}
                 className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50"
               >
-                {loading ? 'Saving...' : editingId ? 'Save Changes' : 'Create App'}
+                {loading ? 'Saving...' : editingId ? 'Save Changes' : 'Create Service'}
               </button>
             </div>
           </div>

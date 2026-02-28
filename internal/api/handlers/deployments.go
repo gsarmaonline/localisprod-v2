@@ -27,21 +27,21 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		ApplicationID string `json:"application_id"`
-		NodeID        string `json:"node_id"`
+		ServiceID string `json:"service_id"`
+		NodeID    string `json:"node_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if body.ApplicationID == "" || body.NodeID == "" {
-		writeError(w, http.StatusBadRequest, "application_id and node_id are required")
+	if body.ServiceID == "" || body.NodeID == "" {
+		writeError(w, http.StatusBadRequest, "service_id and node_id are required")
 		return
 	}
 
-	app, err := h.store.GetApplication(body.ApplicationID, userID)
+	app, err := h.store.GetService(body.ServiceID, userID)
 	if err != nil || app == nil {
-		writeError(w, http.StatusNotFound, "application not found")
+		writeError(w, http.StatusNotFound, "service not found")
 		return
 	}
 
@@ -90,9 +90,9 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	containerName := fmt.Sprintf("localisprod-%s-%s", strings.ReplaceAll(app.Name, " ", "-"), shortID)
 
 	deployment := &models.Deployment{
-		ID:            uuid.New().String(),
-		ApplicationID: body.ApplicationID,
-		NodeID:        body.NodeID,
+		ID:        uuid.New().String(),
+		ServiceID: body.ServiceID,
+		NodeID:    body.NodeID,
 		ContainerName: containerName,
 		ContainerID:   "",
 		Status:        "pending",
@@ -295,7 +295,7 @@ func (h *DeploymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	_ = h.store.UpdateDeploymentStatus(deployment.ID, userID, "running", containerID)
 	_ = h.store.UpdateDeploymentLastDeployedAt(deployment.ID, userID, now)
-	_ = h.store.UpdateApplicationLastDeployedAt(body.ApplicationID, userID, now)
+	_ = h.store.UpdateServiceLastDeployedAt(body.ServiceID, userID, now)
 	deployment.Status = "running"
 	deployment.ContainerID = containerID
 	deployment.LastDeployedAt = &now
@@ -396,7 +396,7 @@ func (h *DeploymentHandler) Restart(w http.ResponseWriter, r *http.Request, id s
 	now := time.Now().UTC()
 	_ = h.store.UpdateDeploymentStatus(id, userID, "running", d.ContainerID)
 	_ = h.store.UpdateDeploymentLastDeployedAt(id, userID, now)
-	_ = h.store.UpdateApplicationLastDeployedAt(d.ApplicationID, userID, now)
+	_ = h.store.UpdateServiceLastDeployedAt(d.ServiceID, userID, now)
 	writeJSON(w, http.StatusOK, map[string]string{
 		"status":  "running",
 		"message": "container restarted",

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { deployments, applications, nodes, Deployment, Application, Node } from '../api/client'
+import { deployments, services, nodes, Deployment, Service, Node } from '../api/client'
 import Modal from '../components/Modal'
 import StatusBadge from '../components/StatusBadge'
 
 export default function Deployments() {
   const [depList, setDepList] = useState<Deployment[]>([])
-  const [appList, setAppList] = useState<Application[]>([])
+  const [appList, setAppList] = useState<Service[]>([])
   const [nodeList, setNodeList] = useState<Node[]>([])
   const [showDeploy, setShowDeploy] = useState(false)
   const [logsModal, setLogsModal] = useState<{ id: string; logs: string } | null>(null)
@@ -18,7 +18,7 @@ export default function Deployments() {
     try {
       const [deps, apps, ns] = await Promise.all([
         deployments.list(),
-        applications.list(),
+        services.list(),
         nodes.list(),
       ])
       setDepList(deps)
@@ -35,7 +35,7 @@ export default function Deployments() {
     if (!selectedApp || !selectedNode) return
     try {
       setLoading(true)
-      await deployments.create({ application_id: selectedApp, node_id: selectedNode })
+      await deployments.create({ service_id: selectedApp, node_id: selectedNode })
       setShowDeploy(false)
       setSelectedApp('')
       setSelectedNode('')
@@ -148,16 +148,16 @@ export default function Deployments() {
       </div>
 
       {showDeploy && (
-        <Modal title="Deploy Application" onClose={() => setShowDeploy(false)}>
+        <Modal title="Deploy Service" onClose={() => setShowDeploy(false)}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Application</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Service</label>
               <select
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 value={selectedApp}
                 onChange={e => setSelectedApp(e.target.value)}
               >
-                <option value="">Select application...</option>
+                <option value="">Select service...</option>
                 {appList.map(a => (
                   <option key={a.id} value={a.id}>{a.name} ({a.docker_image})</option>
                 ))}

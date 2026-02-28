@@ -49,8 +49,8 @@ func sampleNode(name string) *models.Node {
 	}
 }
 
-func sampleApp(name string) *models.Application {
-	return &models.Application{
+func sampleApp(name string) *models.Service {
+	return &models.Service{
 		ID:          name + "-id",
 		Name:        name,
 		DockerImage: "nginx:latest",
@@ -258,22 +258,22 @@ func TestCountNodes(t *testing.T) {
 	}
 }
 
-// ---- Applications ----
+// ---- Services ----
 
-func TestCreateApplication_GetApplication(t *testing.T) {
+func TestCreateService_GetService(t *testing.T) {
 	s := newTestStore(t)
 	a := sampleApp("myapp")
 
-	if err := s.CreateApplication(a, testUserID); err != nil {
-		t.Fatalf("CreateApplication: %v", err)
+	if err := s.CreateService(a, testUserID); err != nil {
+		t.Fatalf("CreateService: %v", err)
 	}
 
-	got, err := s.GetApplication(a.ID, testUserID)
+	got, err := s.GetService(a.ID, testUserID)
 	if err != nil {
-		t.Fatalf("GetApplication: %v", err)
+		t.Fatalf("GetService: %v", err)
 	}
 	if got == nil {
-		t.Fatal("expected non-nil application")
+		t.Fatal("expected non-nil service")
 	}
 	if got.Name != a.Name {
 		t.Errorf("name: got %q, want %q", got.Name, a.Name)
@@ -289,101 +289,101 @@ func TestCreateApplication_GetApplication(t *testing.T) {
 	}
 }
 
-func TestGetApplication_NotFound(t *testing.T) {
+func TestGetService_NotFound(t *testing.T) {
 	s := newTestStore(t)
-	got, err := s.GetApplication("nonexistent", testUserID)
+	got, err := s.GetService("nonexistent", testUserID)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got != nil {
-		t.Fatal("expected nil for missing application")
+		t.Fatal("expected nil for missing service")
 	}
 }
 
-func TestListApplications_Empty(t *testing.T) {
+func TestListServices_Empty(t *testing.T) {
 	s := newTestStore(t)
-	apps, err := s.ListApplications(testUserID)
+	svcs, err := s.ListServices(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(apps) != 0 {
-		t.Fatalf("expected 0 apps, got %d", len(apps))
+	if len(svcs) != 0 {
+		t.Fatalf("expected 0 services, got %d", len(svcs))
 	}
 }
 
-func TestListApplications_Multiple(t *testing.T) {
+func TestListServices_Multiple(t *testing.T) {
 	s := newTestStore(t)
-	_ = s.CreateApplication(sampleApp("app1"), testUserID)
-	_ = s.CreateApplication(sampleApp("app2"), testUserID)
+	_ = s.CreateService(sampleApp("app1"), testUserID)
+	_ = s.CreateService(sampleApp("app2"), testUserID)
 
-	apps, err := s.ListApplications(testUserID)
+	svcs, err := s.ListServices(testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(apps) != 2 {
-		t.Fatalf("expected 2 apps, got %d", len(apps))
+	if len(svcs) != 2 {
+		t.Fatalf("expected 2 services, got %d", len(svcs))
 	}
 }
 
-func TestDeleteApplication(t *testing.T) {
+func TestDeleteService(t *testing.T) {
 	s := newTestStore(t)
 	a := sampleApp("del-app")
-	_ = s.CreateApplication(a, testUserID)
+	_ = s.CreateService(a, testUserID)
 
-	if err := s.DeleteApplication(a.ID, testUserID); err != nil {
-		t.Fatalf("DeleteApplication: %v", err)
+	if err := s.DeleteService(a.ID, testUserID); err != nil {
+		t.Fatalf("DeleteService: %v", err)
 	}
-	got, _ := s.GetApplication(a.ID, testUserID)
+	got, _ := s.GetService(a.ID, testUserID)
 	if got != nil {
 		t.Fatal("expected nil after deletion")
 	}
 }
 
-func TestCreateApplication_WithEncryption(t *testing.T) {
+func TestCreateService_WithEncryption(t *testing.T) {
 	s, _ := newTestStoreWithCipher(t)
 	a := sampleApp("enc-app")
 	a.EnvVars = `{"SECRET":"supersecret","KEY":"value"}`
 
-	if err := s.CreateApplication(a, testUserID); err != nil {
-		t.Fatalf("CreateApplication: %v", err)
+	if err := s.CreateService(a, testUserID); err != nil {
+		t.Fatalf("CreateService: %v", err)
 	}
 
-	// GetApplication should return decrypted value transparently.
-	got, err := s.GetApplication(a.ID, testUserID)
+	// GetService should return decrypted value transparently.
+	got, err := s.GetService(a.ID, testUserID)
 	if err != nil {
-		t.Fatalf("GetApplication: %v", err)
+		t.Fatalf("GetService: %v", err)
 	}
 	if got.EnvVars != a.EnvVars {
 		t.Errorf("env_vars decrypt mismatch: got %q, want %q", got.EnvVars, a.EnvVars)
 	}
 }
 
-func TestListApplications_WithEncryption(t *testing.T) {
+func TestListServices_WithEncryption(t *testing.T) {
 	s, _ := newTestStoreWithCipher(t)
 	a := sampleApp("enc-list-app")
 	a.EnvVars = `{"FOO":"bar"}`
-	_ = s.CreateApplication(a, testUserID)
+	_ = s.CreateService(a, testUserID)
 
-	apps, err := s.ListApplications(testUserID)
+	svcs, err := s.ListServices(testUserID)
 	if err != nil {
-		t.Fatalf("ListApplications: %v", err)
+		t.Fatalf("ListServices: %v", err)
 	}
-	if len(apps) != 1 {
-		t.Fatalf("expected 1 app, got %d", len(apps))
+	if len(svcs) != 1 {
+		t.Fatalf("expected 1 service, got %d", len(svcs))
 	}
-	if apps[0].EnvVars != a.EnvVars {
-		t.Errorf("env_vars mismatch after list decrypt: got %q, want %q", apps[0].EnvVars, a.EnvVars)
+	if svcs[0].EnvVars != a.EnvVars {
+		t.Errorf("env_vars mismatch after list decrypt: got %q, want %q", svcs[0].EnvVars, a.EnvVars)
 	}
 }
 
-func TestCountApplications(t *testing.T) {
+func TestCountServices(t *testing.T) {
 	s := newTestStore(t)
-	count, _ := s.CountApplications(testUserID)
+	count, _ := s.CountServices(testUserID)
 	if count != 0 {
 		t.Fatalf("expected 0, got %d", count)
 	}
-	_ = s.CreateApplication(sampleApp("countapp"), testUserID)
-	count, _ = s.CountApplications(testUserID)
+	_ = s.CreateService(sampleApp("countapp"), testUserID)
+	count, _ = s.CountServices(testUserID)
 	if count != 1 {
 		t.Fatalf("expected 1, got %d", count)
 	}
@@ -391,23 +391,23 @@ func TestCountApplications(t *testing.T) {
 
 // ---- Deployments ----
 
-func setupNodeAndApp(t *testing.T, s *store.Store) (*models.Node, *models.Application) {
+func setupNodeAndApp(t *testing.T, s *store.Store) (*models.Node, *models.Service) {
 	t.Helper()
 	n := sampleNode("dep-node")
 	a := sampleApp("dep-app")
 	if err := s.CreateNode(n, testUserID); err != nil {
 		t.Fatalf("CreateNode: %v", err)
 	}
-	if err := s.CreateApplication(a, testUserID); err != nil {
-		t.Fatalf("CreateApplication: %v", err)
+	if err := s.CreateService(a, testUserID); err != nil {
+		t.Fatalf("CreateService: %v", err)
 	}
 	return n, a
 }
 
-func sampleDeployment(appID, nodeID string) *models.Deployment {
+func sampleDeployment(serviceID, nodeID string) *models.Deployment {
 	return &models.Deployment{
 		ID:            "dep-id",
-		ApplicationID: appID,
+		ServiceID:     serviceID,
 		NodeID:        nodeID,
 		ContainerName: "localisprod-dep-app-abc12345",
 		ContainerID:   "",
@@ -432,8 +432,8 @@ func TestCreateDeployment_GetDeployment(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected non-nil deployment")
 	}
-	if got.ApplicationID != d.ApplicationID {
-		t.Errorf("application_id: got %q, want %q", got.ApplicationID, d.ApplicationID)
+	if got.ServiceID != d.ServiceID {
+		t.Errorf("service_id: got %q, want %q", got.ServiceID, d.ServiceID)
 	}
 	if got.NodeID != d.NodeID {
 		t.Errorf("node_id: got %q, want %q", got.NodeID, d.NodeID)
@@ -475,26 +475,26 @@ func TestListDeployments(t *testing.T) {
 	}
 }
 
-func TestGetDeploymentsByApplicationID(t *testing.T) {
+func TestGetDeploymentsByServiceID(t *testing.T) {
 	s := newTestStore(t)
 	n, a := setupNodeAndApp(t, s)
 	_ = s.CreateDeployment(sampleDeployment(a.ID, n.ID), testUserID)
 
-	deps, err := s.GetDeploymentsByApplicationID(a.ID, testUserID)
+	deps, err := s.GetDeploymentsByServiceID(a.ID, testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(deps) != 1 {
 		t.Fatalf("expected 1, got %d", len(deps))
 	}
-	if deps[0].ApplicationID != a.ID {
-		t.Errorf("wrong application_id: %q", deps[0].ApplicationID)
+	if deps[0].ServiceID != a.ID {
+		t.Errorf("wrong service_id: %q", deps[0].ServiceID)
 	}
 }
 
-func TestGetDeploymentsByApplicationID_Empty(t *testing.T) {
+func TestGetDeploymentsByServiceID_Empty(t *testing.T) {
 	s := newTestStore(t)
-	deps, err := s.GetDeploymentsByApplicationID("no-such-app", testUserID)
+	deps, err := s.GetDeploymentsByServiceID("no-such-service", testUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -554,7 +554,7 @@ func TestCountDeploymentsByStatus(t *testing.T) {
 
 	d2 := &models.Deployment{
 		ID:            "dep2",
-		ApplicationID: a.ID,
+		ServiceID:     a.ID,
 		NodeID:        n.ID,
 		ContainerName: "localisprod-dep-app-xyz98765",
 		Status:        "failed",

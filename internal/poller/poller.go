@@ -56,9 +56,9 @@ func (p *Poller) checkImages() {
 	}
 
 	for _, d := range deployments {
-		app, err := p.store.GetApplication(d.ApplicationID, d.UserID)
+		app, err := p.store.GetService(d.ServiceID, d.UserID)
 		if err != nil || app == nil {
-			log.Printf("poller: get application %s: %v", d.ApplicationID, err)
+			log.Printf("poller: get service %s: %v", d.ServiceID, err)
 			continue
 		}
 

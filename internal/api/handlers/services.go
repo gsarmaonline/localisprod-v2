@@ -13,15 +13,15 @@ import (
 
 var validAppName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
-type ApplicationHandler struct {
+type ServiceHandler struct {
 	store *store.Store
 }
 
-func NewApplicationHandler(s *store.Store) *ApplicationHandler {
-	return &ApplicationHandler{store: s}
+func NewServiceHandler(s *store.Store) *ServiceHandler {
+	return &ServiceHandler{store: s}
 }
 
-func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *ServiceHandler) Create(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(w, r)
 	if userID == "" {
 		return
@@ -50,7 +50,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !validAppName.MatchString(body.Name) {
-		writeError(w, http.StatusBadRequest, "application name must contain only letters, numbers, hyphens, and underscores")
+		writeError(w, http.StatusBadRequest, "service name must contain only letters, numbers, hyphens, and underscores")
 		return
 	}
 
@@ -83,7 +83,7 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		monitoringsJSON = []byte("[]")
 	}
 
-	app := &models.Application{
+	svc := &models.Service{
 		ID:             uuid.New().String(),
 		Name:           body.Name,
 		DockerImage:    body.DockerImage,
@@ -100,54 +100,54 @@ func (h *ApplicationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Monitorings:    string(monitoringsJSON),
 		CreatedAt:      time.Now().UTC(),
 	}
-	if err := h.store.CreateApplication(app, userID); err != nil {
+	if err := h.store.CreateService(svc, userID); err != nil {
 		writeInternalError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, app)
+	writeJSON(w, http.StatusCreated, svc)
 }
 
-func (h *ApplicationHandler) List(w http.ResponseWriter, r *http.Request) {
+func (h *ServiceHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(w, r)
 	if userID == "" {
 		return
 	}
-	apps, err := h.store.ListApplications(userID)
+	svcs, err := h.store.ListServices(userID)
 	if err != nil {
 		writeInternalError(w, err)
 		return
 	}
-	if apps == nil {
-		apps = []*models.Application{}
+	if svcs == nil {
+		svcs = []*models.Service{}
 	}
-	writeJSON(w, http.StatusOK, apps)
+	writeJSON(w, http.StatusOK, svcs)
 }
 
-func (h *ApplicationHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
+func (h *ServiceHandler) Get(w http.ResponseWriter, r *http.Request, id string) {
 	userID := getUserID(w, r)
 	if userID == "" {
 		return
 	}
-	app, err := h.store.GetApplication(id, userID)
+	svc, err := h.store.GetService(id, userID)
 	if err != nil {
 		writeInternalError(w, err)
 		return
 	}
-	if app == nil {
-		writeError(w, http.StatusNotFound, "application not found")
+	if svc == nil {
+		writeError(w, http.StatusNotFound, "service not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, app)
+	writeJSON(w, http.StatusOK, svc)
 }
 
-func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id string) {
+func (h *ServiceHandler) Update(w http.ResponseWriter, r *http.Request, id string) {
 	userID := getUserID(w, r)
 	if userID == "" {
 		return
 	}
-	existing, err := h.store.GetApplication(id, userID)
+	existing, err := h.store.GetService(id, userID)
 	if err != nil || existing == nil {
-		writeError(w, http.StatusNotFound, "application not found")
+		writeError(w, http.StatusNotFound, "service not found")
 		return
 	}
 	var body struct {
@@ -173,7 +173,7 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 		return
 	}
 	if !validAppName.MatchString(body.Name) {
-		writeError(w, http.StatusBadRequest, "application name must contain only letters, numbers, hyphens, and underscores")
+		writeError(w, http.StatusBadRequest, "service name must contain only letters, numbers, hyphens, and underscores")
 		return
 	}
 	envJSON, _ := json.Marshal(body.EnvVars)
@@ -216,28 +216,28 @@ func (h *ApplicationHandler) Update(w http.ResponseWriter, r *http.Request, id s
 	existing.Caches = string(cachesJSON)
 	existing.Kafkas = string(kafkasJSON)
 	existing.Monitorings = string(monitoringsJSON)
-	if err := h.store.UpdateApplication(existing, userID); err != nil {
+	if err := h.store.UpdateService(existing, userID); err != nil {
 		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, existing)
 }
 
-func (h *ApplicationHandler) Delete(w http.ResponseWriter, r *http.Request, id string) {
+func (h *ServiceHandler) Delete(w http.ResponseWriter, r *http.Request, id string) {
 	userID := getUserID(w, r)
 	if userID == "" {
 		return
 	}
-	app, err := h.store.GetApplication(id, userID)
+	svc, err := h.store.GetService(id, userID)
 	if err != nil {
 		writeInternalError(w, err)
 		return
 	}
-	if app == nil {
-		writeError(w, http.StatusNotFound, "application not found")
+	if svc == nil {
+		writeError(w, http.StatusNotFound, "service not found")
 		return
 	}
-	if err := h.store.DeleteApplication(id, userID); err != nil {
+	if err := h.store.DeleteService(id, userID); err != nil {
 		writeInternalError(w, err)
 		return
 	}

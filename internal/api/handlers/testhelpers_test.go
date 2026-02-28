@@ -97,10 +97,10 @@ func mustCreateNode(t *testing.T, s *store.Store) *models.Node {
 	return n
 }
 
-// mustCreateApp inserts an application into the store and returns it.
-func mustCreateApp(t *testing.T, s *store.Store) *models.Application {
+// mustCreateApp inserts a service into the store and returns it.
+func mustCreateApp(t *testing.T, s *store.Store) *models.Service {
 	t.Helper()
-	a := &models.Application{
+	a := &models.Service{
 		ID:          "test-app-id",
 		Name:        "test-app",
 		DockerImage: "nginx:latest",
@@ -111,18 +111,18 @@ func mustCreateApp(t *testing.T, s *store.Store) *models.Application {
 		Domain:      "",
 		CreatedAt:   time.Now().UTC(),
 	}
-	if err := s.CreateApplication(a, testUserID); err != nil {
-		t.Fatalf("CreateApplication: %v", err)
+	if err := s.CreateService(a, testUserID); err != nil {
+		t.Fatalf("CreateService: %v", err)
 	}
 	return a
 }
 
 // mustCreateDeployment inserts a deployment into the store and returns it.
-func mustCreateDeployment(t *testing.T, s *store.Store, appID, nodeID string) *models.Deployment {
+func mustCreateDeployment(t *testing.T, s *store.Store, serviceID, nodeID string) *models.Deployment {
 	t.Helper()
 	d := &models.Deployment{
 		ID:            "test-dep-id",
-		ApplicationID: appID,
+		ServiceID:     serviceID,
 		NodeID:        nodeID,
 		ContainerName: "localisprod-test-app-abcd1234",
 		ContainerID:   "abc123",

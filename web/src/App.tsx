@@ -10,7 +10,7 @@ import {
 import Dashboard from './pages/Dashboard'
 import Nodes from './pages/Nodes'
 import NodeDetail from './pages/NodeDetail'
-import Applications from './pages/Applications'
+import Services from './pages/Services'
 import Databases from './pages/Databases'
 import Caches from './pages/Caches'
 import Kafkas from './pages/Kafkas'
@@ -24,7 +24,7 @@ import Login from './pages/Login'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: faGaugeHigh },
   { to: '/nodes', label: 'Nodes', icon: faServer },
-  { to: '/applications', label: 'Applications', icon: faBoxOpen },
+  { to: '/services', label: 'Services', icon: faBoxOpen },
   { to: '/databases', label: 'Databases', icon: faDatabase },
   { to: '/caches', label: 'Cache', icon: faMemory },
   { to: '/kafkas', label: 'Kafka', icon: faStream },
@@ -115,7 +115,7 @@ function AppLayout() {
             <Route path="/" element={<Dashboard />} />
             <Route path="/nodes" element={<Nodes />} />
             <Route path="/nodes/:id" element={<NodeDetail />} />
-            <Route path="/applications" element={<Applications />} />
+            <Route path="/services" element={<Services />} />
             <Route path="/databases" element={<Databases />} />
             <Route path="/caches" element={<Caches />} />
             <Route path="/kafkas" element={<Kafkas />} />

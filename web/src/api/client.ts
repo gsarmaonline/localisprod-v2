@@ -91,8 +91,8 @@ export const volumeMigration = {
     request<{ status: string }>(`/nodes/${nodeId}/volumes/bak`, { method: 'DELETE' }),
 }
 
-// Applications
-export interface Application {
+// Services
+export interface Service {
   id: string
   name: string
   docker_image: string
@@ -111,7 +111,7 @@ export interface Application {
   last_deployed_at?: string
 }
 
-export interface CreateApplicationInput {
+export interface CreateServiceInput {
   name: string
   docker_image: string
   dockerfile_path?: string
@@ -296,15 +296,15 @@ export const objectStorages = {
     request<void>(`/object-storages/${id}`, { method: 'DELETE' }),
 }
 
-export const applications = {
-  list: () => request<Application[]>('/applications'),
-  get: (id: string) => request<Application>(`/applications/${id}`),
-  create: (data: CreateApplicationInput) =>
-    request<Application>('/applications', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: CreateApplicationInput) =>
-    request<Application>(`/applications/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+export const services = {
+  list: () => request<Service[]>('/services'),
+  get: (id: string) => request<Service>(`/services/${id}`),
+  create: (data: CreateServiceInput) =>
+    request<Service>('/services', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: CreateServiceInput) =>
+    request<Service>(`/services/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) =>
-    request<void>(`/applications/${id}`, { method: 'DELETE' }),
+    request<void>(`/services/${id}`, { method: 'DELETE' }),
 }
 
 // GitHub
@@ -340,7 +340,7 @@ export const settings = {
 // Deployments
 export interface Deployment {
   id: string
-  application_id: string
+  service_id: string
   node_id: string
   container_name: string
   container_id: string
@@ -353,7 +353,7 @@ export interface Deployment {
 }
 
 export interface CreateDeploymentInput {
-  application_id: string
+  service_id: string
   node_id: string
 }
 
@@ -393,7 +393,7 @@ export const providers = {
 }
 
 // Docker Compose Import
-export interface ComposeParsedApplication {
+export interface ComposeParsedService {
   name: string
   docker_image: string
   build_path?: string
@@ -435,7 +435,7 @@ export interface ComposeParsedObjectStorage {
 }
 
 export interface ComposePreview {
-  applications: ComposeParsedApplication[]
+  services: ComposeParsedService[]
   databases: ComposeParsedDatabase[]
   caches: ComposeParsedCache[]
   kafkas: ComposeParsedKafka[]
@@ -453,7 +453,7 @@ export const composeImport = {
 // Dashboard
 export interface Stats {
   nodes: number
-  applications: number
+  services: number
   deployments: Record<string, number>
 }
 
