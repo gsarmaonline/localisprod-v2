@@ -25,8 +25,8 @@ func TestDashboardStats_Empty(t *testing.T) {
 	if nodes, ok := resp["nodes"].(float64); !ok || nodes != 0 {
 		t.Errorf("expected nodes=0, got %v", resp["nodes"])
 	}
-	if apps, ok := resp["applications"].(float64); !ok || apps != 0 {
-		t.Errorf("expected applications=0, got %v", resp["applications"])
+	if apps, ok := resp["services"].(float64); !ok || apps != 0 {
+		t.Errorf("expected services=0, got %v", resp["services"])
 	}
 	if resp["deployments"] == nil {
 		t.Error("expected deployments key in response")
@@ -55,8 +55,8 @@ func TestDashboardStats_WithData(t *testing.T) {
 	if nodes, ok := resp["nodes"].(float64); !ok || nodes != 1 {
 		t.Errorf("expected nodes=1, got %v", resp["nodes"])
 	}
-	if apps, ok := resp["applications"].(float64); !ok || apps != 1 {
-		t.Errorf("expected applications=1, got %v", resp["applications"])
+	if apps, ok := resp["services"].(float64); !ok || apps != 1 {
+		t.Errorf("expected services=1, got %v", resp["services"])
 	}
 
 	deplMap, ok := resp["deployments"].(map[string]any)
