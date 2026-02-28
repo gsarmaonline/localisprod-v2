@@ -2,7 +2,7 @@
  * Production end-to-end API test suite for localisprod.com
  *
  * Covers the full user flow:
- *   auth → dashboard → settings → node → application → database → deployment → cleanup
+ *   auth → dashboard → settings → node → service → database → deployment → cleanup
  *
  * Prerequisites:
  *   1. Run `npm run auth` or `npm run auth:ssh` to populate .session

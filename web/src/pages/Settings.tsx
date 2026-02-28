@@ -229,7 +229,7 @@ export default function Settings() {
               <li>Click <strong>Add webhook</strong>. GitHub will send a ping event to verify the URL.</li>
             </ol>
             <p className="text-xs text-gray-500 pt-1">
-              Once configured, every time a new image is published to GHCR for this repository, all running deployments for the matching application will be automatically updated.
+              Once configured, every time a new image is published to GHCR for this repository, all running deployments for the matching service will be automatically updated.
             </p>
           </div>
         )}
