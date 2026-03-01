@@ -204,3 +204,7 @@ When an application has a `github_repo` set, publishing a new image to GHCR auto
    - Secret: the same value as step 1
    - Events: choose **Registry packages**
 3. On each new image publish, the server will `docker pull`, stop/remove the old container, and start a fresh one with the same config.
+
+---
+
+*Last updated: 2026-03-01*
